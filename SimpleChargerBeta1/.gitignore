@@ -1,0 +1,9 @@
+/Debug/
+/Release/
+.cproject
+.project
+*.o
+*.elf
+*.hex
+!charger.elf
+!charger.hex

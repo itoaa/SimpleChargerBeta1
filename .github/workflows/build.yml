@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  avr:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: SimpleChargerBeta1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AVR toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-avr avr-libc binutils-avr make
+
+      - name: Build
+        run: make all
+
+      - name: Create hex
+        run: avr-objcopy -O ihex -R .eeprom charger.elf charger.hex
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: charger
+          path: |
+            SimpleChargerBeta1/charger.elf
+            SimpleChargerBeta1/charger.hex
+
+      - name: Commit firmware
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f charger.elf charger.hex
+          if git diff --staged --quiet; then
+            echo "Firmware unchanged"
+          else
+            git commit -m "Build charger firmware [skip ci]"
+            git push
+          fi
