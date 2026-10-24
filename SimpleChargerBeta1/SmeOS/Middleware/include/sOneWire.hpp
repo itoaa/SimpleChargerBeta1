@@ -15,30 +15,11 @@
 #include <avr/interrupt.h>
 
 
-#if defined(__AVR__)
 #include <util/crc16.h>
-#endif
 
-/*
-#if ARDUINO >= 100
-#include <Arduino.h>       // for delayMicroseconds, digitalPinToBitMask, etc
-#else
-#include "WProgram.h"      // for delayMicroseconds
-#include "pins_arduino.h"  // for digitalPinToBitMask, etc
-#endif
-*/
+/* Optional pieces. This file is not in the charger build. */
 
-// You can exclude certain features from OneWire.  In theory, this
-// might save some space.  In practice, the compiler automatically
-// removes unused code (technically, the linker, using -fdata-sections
-// and -ffunction-sections when compiling, and Wl,--gc-sections
-// when linking), so most of these will not result in any code size
-// reduction.  Well, unless you try to use the missing features
-// and redesign your program to not need them!  ONEWIRE_CRC8_TABLE
-// is the exception, because it selects a fast but large algorithm
-// or a small but slow algorithm.
-
-// you can exclude onewire_search by defining that to 0
+/* Set to 0 to leave out the bus search. */
 #ifndef ONEWIRE_SEARCH
 #define ONEWIRE_SEARCH 1
 #endif
@@ -63,14 +44,9 @@
 #define ONEWIRE_CRC16 1
 #endif
 
-// Board-specific macros for direct GPIO
-// #include <util/OneWire_direct_regtype.h>
-
 class OneWire
 {
   private:
- //   IO_REG_TYPE bitmask;
- //   volatile IO_REG_TYPE *baseReg;
     uint8_t lPort;
     uint8_t lPin;
     sGPIO pOneWire;
@@ -187,11 +163,6 @@ class OneWire
 #endif
 #endif
 };
-
-// Prevent this name from leaking into Arduino sketches
-#ifdef IO_REG_TYPE
-#undef IO_REG_TYPE
-#endif
 
 #endif // __cplusplus
 
