@@ -3,7 +3,8 @@
 #include <string.h>
 
 /* TunerStudio matches these bytes. The trailing NUL is not sent. */
-static const char codeString[] = "MSII s-Charger B-1  ";
+/* B-2 marks the 14-byte realtime block. An older ini must not read these int16 fields. */
+static const char codeString[] = "MSII s-Charger B-2  ";
 static const char codeRev[] = "Smedby simple Charger Beta 1";
 static const char protocolVersion[] = "001";
 
@@ -14,10 +15,9 @@ TunerStudio::TunerStudio()
 	: state(Idle), pendingOffset(0), pendingCount(0), sendFn(0), sendCtx(0), burnFn(0), burnCtx(0)
 {
 	memset(&page1, 0, sizeof(page1));
-	/* Small duty after reset. OCR = duty * 10, so 5 is not half scale. */
+	/* Cap only. Applied duty stays 0 until main sees a voltage limit and a current limit. */
 	page1.MaxPWM = 5;
 	memset(&realtime, 0, sizeof(realtime));
-	realtime.pulseWidth = page1.MaxPWM;
 }
 
 void TunerStudio::setSend(void (*send)(const uint8_t* data, uint8_t len, void* ctx), void* ctx)

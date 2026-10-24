@@ -52,12 +52,17 @@ int16_t Filter::getFilteredValue(void)
 	top = min((((filterSamples * 85) / 100) + 1  ), (filterSamples - 1));
 	k = 0;
 	total = 0;
-	for ( l = bottom; l< top; l++)
+	/* Drop the low and high tails. Sum the middle that remains, not the start of the sorted buffer. */
+	for (l = bottom; l < top; l++)
 	{
-		total += pSensArray1Sort[k];
+		total += pSensArray1Sort[l];
 		k++;
 	}
-	return( total / k);
+	if (k == 0)
+	{
+		return 0;
+	}
+	return (int16_t)(total / k);
 }
 
 int16_t Filter::getValue(uint8_t index)

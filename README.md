@@ -12,7 +12,9 @@ make all
 
 TunerStudio signature, including the two trailing spaces:
 
-`"MSII s-Charger B-1  "`
+`"MSII s-Charger B-2  "`
+
+That signature is the 14-byte realtime block: output current and the 12 V rail are 16-bit. The PWM output stays at duty 0 until TunerStudio has a charge-voltage limit and a charge-current limit. This board has no input-current pin.
 
 Command `F` replies `001`.
 

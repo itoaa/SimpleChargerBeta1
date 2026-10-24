@@ -36,10 +36,7 @@
 
 	const int  Temp_Measure_type 	= 2;		/* 1 = NTC, 2 = DS18B20. OneWire is not linked. */
 	const int  Current_Measure_type = 2;		/* Output sensor. 1 = 5 A, 2 = 20 A, 3 = 30 A. */
-	/* This board has no input-current pin. Keep the channel main already used. */
-	const int  InputCurrentPin		= 7;		/* ADC7. */
-	const int  InputCurrentPort		= 2;		/* Same port the current driver was given before. */
-	const int  InputCurrentMeasureType = 1;		/* 5 A sensor. Do not reuse Current_Measure_type. */
+	/* No input-current pin on this board. ADC7 is not a DIP pin, so main does not sample it. */
 	const int  RedLedPin	 		= PD5;
 	const int  RedLedPort 			= 3;
 	const int  YellowLedPin			= PD4;
@@ -70,9 +67,7 @@
 
 	const int  Temp_Measure_type 	= 2;		/* 1 = NTC, 2 = DS18B20. OneWire is not linked. */
 	const int  Current_Measure_type = 3;		/* Output sensor. 1 = 5 A, 2 = 20 A, 3 = 30 A. */
-	const int  InputCurrentPin		= 7;		/* ADC7. No separate input pin is defined for this board. */
-	const int  InputCurrentPort		= 2;
-	const int  InputCurrentMeasureType = 1;		/* 5 A sensor. */
+	/* No input-current pin on this board. */
 	const int  RedLedPin	 		= PB0;
 	const int  RedLedPort 			= 1;
 	const int  YellowLedPin			= PB1;

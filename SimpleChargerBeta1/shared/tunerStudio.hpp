@@ -1,7 +1,8 @@
 /*
  * TunerStudio protocol without a UART.
  * main feeds onByte() and sends replies through setSend().
- * Command letters, RTPS and PG1S stay fixed so the byte layout does not move.
+ * Command letters stay fixed. The realtime block grew when amps and the 12 V rail became int16.
+ * tunerStudio.ini must use the same signature and the same offsets.
  */
 
 #ifndef SHARED_TUNERSTUDIO_HPP_
@@ -15,7 +16,7 @@ struct __attribute__((packed,aligned(1))) Page1DataStruct {
     uint8_t MaxChargeVolt;
     uint8_t MaxInputAmp;
     uint8_t MaxInputVolt;
-    uint8_t MaxPWM;					/* Default 5. setDuty() writes OCR = duty * 10. */
+    uint8_t MaxPWM;					/* Cap, default 5. The output stays off until volt and current limits are set. */
     uint8_t MinPWM;
     uint8_t MaxTemp;
     uint8_t accelerationDelay;
@@ -26,19 +27,19 @@ struct __attribute__((packed,aligned(1))) Page1DataStruct {
 struct __attribute__((packed,aligned(1))) RPageVarsStruct
 {
     uint8_t seconds;				/* millis() / 1000, wraps at 255. */
-    uint8_t pulseWidth;				/* MaxPWM duty last applied. */
+    uint8_t pulseWidth;				/* Duty last written. 0 until the regulator allows it. */
     uint8_t unusedRpm;				/* No RPM sensor. Stays 0. */
     uint8_t throttlePosition;		/* No TPS sensor. Stays 0. */
-    int8_t  InputAmp;
+    int16_t InputAmp;				/* 0.1 A per count. No input sensor on this board, so this stays 0. */
     int8_t  InputVolt;
-    int8_t  OutputAmp;
+    int16_t OutputAmp;				/* 0.1 A per count. int16 so a 20 A sensor does not wrap. */
     int8_t  OutputVolt;
     int8_t  MosfetTempCor;			/* Not measured. OneWire is not in this build. */
     int8_t  MosfetTempADC;			/* Not measured. */
-    int8_t  MosfetDriverVolt;		/* 12 V rail, 0.1 V per count. */
+    int16_t MosfetDriverVolt;		/* 12 V rail, 0.1 V per count. int16 so a rail above 12.7 V fits. */
 };
 
-#define RTPS  11
+#define RTPS  14
 #define PG1S  33
 
 class TunerStudio
