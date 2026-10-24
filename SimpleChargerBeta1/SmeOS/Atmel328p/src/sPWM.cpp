@@ -14,8 +14,7 @@ sPWM::sPWM(int port, int pin)						// port, 1 = PortB, 2 = PortC, 3 = portD
 {
 	pPin = pin;										// Store pin in private variable
 	pPort = port;									// 1 = PortB, 2 = PortC, 3 = PortD
-	pMode = 1;										// mode = ??? fix
-//	printf("Setting up PWM on port %d and pin %d\n\r",pPort, pPin);
+	pMode = 1;
 	pPWMPin.init(pPort, pPin,1);
 	pMaxCount = 254;
 	pPrescaler = 0;
@@ -30,7 +29,7 @@ sPWM::sPWM(int port, int pin)						// port, 1 = PortB, 2 = PortC, 3 = portD
 
 void	sPWM::setDuty(double duty)
 {
-	/* Samma skala som den gamla raden OCR1A = MaxPWM * 10. */
+	/* OCR = duty * 10. Leave this scale alone. */
 	setDutyValue((int)(duty * 10.0));
 }
 
@@ -40,7 +39,7 @@ void	sPWM::setDutyValue(int value)
 	{
 		value = 0;
 	}
-	/* Timer 0 är 1 ms-tick, så PD5/PD6 lämnas orörda. */
+	/* Timer 0 is the 1 ms tick, so PD5 and PD6 stay with that timer. */
 	if (pPort == 1 && pPin == 1)
 	{
 		OCR1A = (uint16_t)value;
@@ -64,30 +63,27 @@ void	sPWM::stop()
 }
 void	sPWM::setMode(int mode)
 {
-	if (mode ==1)											// mode 1 = fast PWM, fixed frequensy
+	if (mode ==1)											// mode 1 = fast PWM, fixed frequency
 	{
 		if (pPort == 1)										// PB1 and PB2, Timer 1, 16 bit. PB3 Timer 2, 8 bit
 		{
 			if (pPin == 1)
 			{
-				TCCR1A = (1 << COM1A1)	|	(1 << WGM10);	// Clear on match, set at bottom. Fast PWM 8bit
-//				TCCR1B = (1 << WGM12);						// Fast PWM 8bit
-				pMaxCount = 254;							// Max count for PWM to be 100 DS.
-//				puts("Setting up FastPWM mode for PB1");
+				TCCR1A = (1 << COM1A1)	|	(1 << WGM10);	// Clear on match, set at bottom. Fast PWM 8 bit
+//				TCCR1B = (1 << WGM12);						// Fast PWM 8 bit
+				pMaxCount = 254;							// Top for full duty.
 			}
 			if (pPin == 2)
 			{
-				TCCR1A = (1 << COM1B1)	|	(1 << WGM10);	// Clear on match, set at bottom. Fast PWM 8bit
-//				TCCR1B = (1 << WGM12);						// Fast PWM 8bit
-				pMaxCount = 254;							// Max count for PWM to be 100 DS.
-				//puts("Setting up FastPWM mode for PB2");
+				TCCR1A = (1 << COM1B1)	|	(1 << WGM10);	// Clear on match, set at bottom. Fast PWM 8 bit
+//				TCCR1B = (1 << WGM12);						// Fast PWM 8 bit
+				pMaxCount = 254;							// Top for full duty.
 			}
 			if (pPin == 3)
 			{
-				TCCR2A = (1 << COM2A1)	|	(1 << WGM20)|	(1 << WGM21);	// Clear on match, set at bottom. Fast PWM 8bit
-//				TCCR2B = (1 << WGM12);						// Fast PWM 8bit
-				pMaxCount = 254;							// Max count for PWM to be 100 DS.
-//				puts("Setting up FastPWM mode for PB3");
+				TCCR2A = (1 << COM2A1)	|	(1 << WGM20)|	(1 << WGM21);	// Clear on match, set at bottom. Fast PWM 8 bit
+//				TCCR2B = (1 << WGM12);						// Fast PWM 8 bit
+				pMaxCount = 254;							// Top for full duty.
 			}
 
 		}
@@ -95,24 +91,21 @@ void	sPWM::setMode(int mode)
 		{
 			if (pPin == 3)
 			{
-				TCCR2B = (1 << COM2A1)	|	(1 << WGM20) |	(1 << WGM21);	// Clear on match, set at bottom. Fast PWM 8bit
-	//			TCCR2B = (1 << WGM12);						// Fast PWM 8bit
-				pMaxCount = 254;							// Max count for PWM to be 100 DS.
-//				puts("Setting up FastPWM mode for PD3");
+				TCCR2B = (1 << COM2A1)	|	(1 << WGM20) |	(1 << WGM21);	// Clear on match, set at bottom. Fast PWM 8 bit
+	//			TCCR2B = (1 << WGM12);						// Fast PWM 8 bit
+				pMaxCount = 254;							// Top for full duty.
 			}
 			if (pPin == 5)
 			{
-				TCCR0A = (1 << COM0B1)	|	(1 << WGM00) |	(1 << WGM01);	// Clear on match, set at bottom. Fast PWM 8bit
-	//			TCCR0B = (1 << WGM12);						// Fast PWM 8bit
-				pMaxCount = 254;							// Max count for PWM to be 100 DS.
-//				puts("Setting up FastPWM mode for PD5");
+				TCCR0A = (1 << COM0B1)	|	(1 << WGM00) |	(1 << WGM01);	// Clear on match, set at bottom. Fast PWM 8 bit
+	//			TCCR0B = (1 << WGM12);						// Fast PWM 8 bit
+				pMaxCount = 254;							// Top for full duty.
 			}
 			if (pPin == 6)
 			{
-				TCCR0A = (1 << COM0A1)	|	(1 << WGM00) |	(1 << WGM01);	// Clear on match, set at bottom. Fast PWM 8bit
-	//			TCCR0B = (1 << WGM12);						// Fast PWM 8bit
-				pMaxCount = 254;							// Max count for PWM to be 100 DS.
-//				puts("Setting up FastPWM mode for PD6");
+				TCCR0A = (1 << COM0A1)	|	(1 << WGM00) |	(1 << WGM01);	// Clear on match, set at bottom. Fast PWM 8 bit
+	//			TCCR0B = (1 << WGM12);						// Fast PWM 8 bit
+				pMaxCount = 254;							// Top for full duty.
 			}
 
 		} // mode 1, fast PWM
@@ -124,22 +117,19 @@ bool	sPWM::setPrescaler(int prescaler)
 	{
 		if (pPin == 1)
 		{
-			TCCR1B = (1 << CS10);						// timer 1 16 bit, No prescaler. only support no prescaler right now :-(
-//			puts("Setting up prescaler for PB1");
+			TCCR1B = (1 << CS10);						// Timer 1, no prescaler. Only prescaler 1 is supported.
 			if (prescaler == 1) { return(1); }
 			else return(0);
 		}
 		if (pPin == 2)
 		{
-			TCCR1B = (1 << CS10);						// timer 1 16 bit, No prescaler. only support no prescaler right now :-(
-//			puts("Setting up prescaler for PB2");
+			TCCR1B = (1 << CS10);						// Timer 1, no prescaler. Only prescaler 1 is supported.
 			if (prescaler == 1) { return(1); }
 			else return(0);
 		}
 		if (pPin == 3)
 		{
-			TCCR2B = (1 << CS20);						// timer 2 8 bit No prescaler. only support no prescaler right now :-(
-//			puts("Setting up prescaler for PB3");
+			TCCR2B = (1 << CS20);						// Timer 2, no prescaler. Only prescaler 1 is supported.
 			if (prescaler == 1) { return(1); }
 			else return(0);
 		}
@@ -149,22 +139,19 @@ bool	sPWM::setPrescaler(int prescaler)
 	{
 		if (pPin == 3)
 		{
-			TCCR2B = (1 << CS20);						// No prescaler. only support no prescaler right now :-(
-//			puts("Setting up prescaler dor PD3");
+			TCCR2B = (1 << CS20);						// No prescaler. Only prescaler 1 is supported.
 			if (prescaler == 1) { return(1); }
 			else return(0);
 		}
 		if (pPin == 5)
 		{
-			TCCR0B = (1 << CS00);						// No prescaler. only support no prescaler right now :-(
-//			puts("Setting up prescaler dor PD5");
+			TCCR0B = (1 << CS00);						// No prescaler. Only prescaler 1 is supported.
 			if (prescaler == 1) { return(1); }
 			else return(0);
 		}
 		if (pPin == 6)
 		{
-			TCCR0B = (1 << CS00);						// No prescaler. only support no prescaler right now :-(
-//			puts("Setting up prescaler dor PD6");
+			TCCR0B = (1 << CS00);						// No prescaler. Only prescaler 1 is supported.
 			if (prescaler == 1) { return(1); }
 			else return(0);
 		}
@@ -176,7 +163,7 @@ void	sPWM::inverse(bool inverse)
 {
 
 }
-int		sPWM::getFrequensy()
+int		sPWM::getFrequency()
 {
 	return(0);
 }

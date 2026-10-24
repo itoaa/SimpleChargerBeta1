@@ -7,7 +7,7 @@ static volatile uint32_t gMillis;
 static uint32_t gCyclesPerTick;
 static uint32_t gCredit;
 
-/* Varje avbrott lägger till så många cykler som ticket tog. En millisekund är F_CPU cykler / 1000. */
+/* Each interrupt adds the cycles that tick took. One millisecond is F_CPU / 1000 cycles. */
 ISR(TIMER0_COMPA_vect)
 {
 	gCredit += gCyclesPerTick * 1000UL;
@@ -18,7 +18,7 @@ ISR(TIMER0_COMPA_vect)
 	}
 }
 
-/* Närmaste prescaler där ett tick ryms i timer 0 och ligger nära 1 ms. */
+/* Prescaler whose tick fits in timer 0 and lands nearest 1 ms. */
 static void chooseTick(uint16_t* prescaler, uint8_t* csBits, uint8_t* ocr)
 {
 	const uint16_t prescList[5] = { 1, 8, 64, 256, 1024 };
@@ -77,7 +77,7 @@ uint32_t millis(void)
 {
 	uint32_t now;
 	uint8_t sreg = SREG;
-	/* 32-bitars läsning är inte atomär på den här kärnan. */
+	/* A 32-bit read is not atomic on this core. */
 	cli();
 	now = gMillis;
 	SREG = sreg;

@@ -9,7 +9,7 @@ Filter::Filter(uint8_t bufferL)
 {
 	pBufferLength = bufferL;
 	pBufferPosition = 0;
-	/* Oinitierat minne ska inte räknas med i första medelvärdet. */
+	/* A cleared buffer keeps the first average off leftover stack data. */
 	memset(pSensArray1, 0, sizeof(pSensArray1));
 	memset(pSensArray1Sort, 0, sizeof(pSensArray1Sort));
 }

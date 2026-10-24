@@ -7,7 +7,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-/* Avvikelse mellan önskad och verklig baud. u2x är 0 eller 1. */
+/* Difference between the requested baud and the baud UBRR actually makes. u2x is 0 or 1. */
 static uint32_t baudError(uint32_t baud, uint16_t ubrr, uint8_t u2x)
 {
 	uint32_t divisor = (uint32_t)(16UL >> u2x) * ((uint32_t)ubrr + 1UL);
@@ -29,7 +29,7 @@ ISR(USART_RX_vect)
 {
 	uint8_t data = UDR0;
 	uint8_t next = (uint8_t)((rxHead + 1) & (RX_SIZE - 1));
-	/* Full buffert: släng nya byten så loopen inte blockeras. */
+	/* Drop new bytes when the ring is full so the main loop is not stalled. */
 	if (next != rxTail)
 	{
 		rxBuf[rxHead] = data;
@@ -53,7 +53,7 @@ void sSerial::uartInit(uint32_t baud)
 		return;
 	}
 
-	/* Samma avrundning som setbaud.h, med och utan dubbel hastighet. */
+	/* Same rounding as setbaud.h, with and without double speed. */
 	uint32_t normal = (F_CPU + 8UL * baud) / (16UL * baud);
 	uint32_t doubled = (F_CPU + 4UL * baud) / (8UL * baud);
 	uint32_t ubrrNormal = (normal > 0UL) ? (normal - 1UL) : 0UL;
@@ -90,7 +90,7 @@ void sSerial::uartInit(uint32_t baud)
 	UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0);
 }
 
-bool sSerial::dataRecived()
+bool sSerial::dataReceived()
 {
 	return rxHead != rxTail;
 }

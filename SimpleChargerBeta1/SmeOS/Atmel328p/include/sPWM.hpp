@@ -20,7 +20,7 @@ class sPWM
   int	pPort;											// 1 portB, 2 portC, 3 portD
   int	pPrescaler;										// 1, 2, 4, 8, 16 ... Dependent on port and pin
   int	pMode;
-  int	pMaxCount;										// How far PWM is counting. Normaly 255 for 8 bit and 1024 for 16bit, but can be different value.
+  int	pMaxCount;										// How far PWM counts. Normally 255 for 8 bit. Can be another top.
   bool	pInverse;
   sGPIO	pPWMPin;
 
@@ -34,10 +34,10 @@ class sPWM
   void	stop();											// Stop PWM
   void	setMode(int);									// Set PWM mode
   bool	setPrescaler(int);								// Set prescaler. 1, 8, 256 ... Returns true if prescaler is possible.
-  bool	setFrequensy(int);								// Set PWM frequensy. changes both prescaler and max count. Returns true if frequensy is possible
+  bool	setFrequency(int);								// Set PWM frequency. Changes prescaler and top. True if that frequency is possible.
   void	inverse(bool);									// Inverse output? 1 = yes, 0 = no
-  int	getFrequensy();									// Get PWM frequensy.
-  int	getResolution();								// Get count number from 0 to 100% DS.
+  int	getFrequency();									// Get PWM frequency.
+  int	getResolution();								// Counts from 0 to full duty.
 
  };
 

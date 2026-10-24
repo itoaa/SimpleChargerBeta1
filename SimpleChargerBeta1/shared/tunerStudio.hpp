@@ -1,7 +1,7 @@
 /*
- * TunerStudio/MegaTune-protokoll utan UART och utan operativsystem.
- * AVR-loopen och en framtida FreeRTOS-task matar onByte() och skickar svar via setSend().
- * Kommandon, RTPS och PG1S är oförändrade så befintlig ini-fil stämmer.
+ * TunerStudio protocol without a UART.
+ * main feeds onByte() and sends replies through setSend().
+ * Command letters, RTPS and PG1S stay fixed so the byte layout does not move.
  */
 
 #ifndef SHARED_TUNERSTUDIO_HPP_
@@ -15,27 +15,27 @@ struct __attribute__((packed,aligned(1))) Page1DataStruct {
     uint8_t MaxChargeVolt;
     uint8_t MaxInputAmp;
     uint8_t MaxInputVolt;
-    uint8_t MaxPWM;
+    uint8_t MaxPWM;					/* Default 5. setDuty() writes OCR = duty * 10. */
     uint8_t MinPWM;
     uint8_t MaxTemp;
-    uint8_t accDelay;
+    uint8_t accelerationDelay;
     uint8_t mosfetTempADCTable[12];
     int8_t  mosfetTempTable[12];
 };
 
 struct __attribute__((packed,aligned(1))) RPageVarsStruct
 {
-    uint8_t seconds;
-    uint8_t pw1;
-    uint8_t rpm;
-    uint8_t TPSPos;
+    uint8_t seconds;				/* millis() / 1000, wraps at 255. */
+    uint8_t pulseWidth;				/* MaxPWM duty last applied. */
+    uint8_t unusedRpm;				/* No RPM sensor. Stays 0. */
+    uint8_t throttlePosition;		/* No TPS sensor. Stays 0. */
     int8_t  InputAmp;
     int8_t  InputVolt;
     int8_t  OutputAmp;
     int8_t  OutputVolt;
-    int8_t  MosfetTempCor;
-    int8_t  MosfetTempADC;
-    int8_t  MosfetDriverVolt;
+    int8_t  MosfetTempCor;			/* Not measured. OneWire is not in this build. */
+    int8_t  MosfetTempADC;			/* Not measured. */
+    int8_t  MosfetDriverVolt;		/* 12 V rail, 0.1 V per count. */
 };
 
 #define RTPS  11
@@ -48,9 +48,9 @@ public:
 	Page1DataStruct page1;
 
 	TunerStudio();
-	/* send får råa bytes. ctx är pekaren som skickades till setSend. */
+	/* send gets raw bytes. ctx is the pointer passed to setSend. */
 	void setSend(void (*send)(const uint8_t* data, uint8_t len, void* ctx), void* ctx);
-	/* Kommando B. Tom pekare betyder att inget sparas. */
+	/* Command B. A null function means nothing is stored. */
 	void setOnBurn(void (*burn)(void* ctx), void* ctx);
 	void onByte(uint8_t byte);
 

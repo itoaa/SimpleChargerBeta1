@@ -42,7 +42,7 @@ class sADC
   void	setADCMode(uint8_t mode);				// Set ADC to run either 8 or 10 bit mode (MODE_8_BIT or MODE_10_BIT)
   uint8_t getADCMode(void);						// Returns 8 or 10 bit mode, (returns MODE_8_BIT or MODE_10_BIT)
   												// For example: if (getMode() == MODE_8_BIT) ...
-  uint8_t ADCIsConverting(void);					// returns ADC_CONVERTONG if the ADC is converting, otherwise ADC_DONE
+  uint8_t ADCIsConverting(void);					// ADC_CONVERTING while a conversion is running, otherwise ADC_DONE
   												// For example: if (analogIsConverting() == ADC_CONVERTING) ...
   // the following method can be used to initiate an ADC conversion
   // that runs in the background, allowing the CPU to perform other tasks

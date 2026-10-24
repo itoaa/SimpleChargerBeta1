@@ -1,8 +1,7 @@
 /*
  * Hardware.hpp
  *
- *  Created on: 11 dec. 2018
- *      Author: Ola Andersson
+ * Pin map for the board selected below. Port numbers are 1 = B, 2 = C, 3 = D.
  */
 
 #ifndef HARDWARE_HPP_
@@ -11,7 +10,7 @@
 #include <avr/io.h>
 #include <stdint.h>
 
-// Define for witch hardware to compile
+/* Which board this build is for. */
 #define SmedbyCharger11				1
 #define DCC							0
 
@@ -20,70 +19,74 @@
 
 #if SmedbyCharger11 == 1
 
-// Define what pins and ports to use on the MPU
-// in reality, PD6 is really just '6'
+	const int  InputVoltPin  		= PC2;		/* Battery voltage, PC2 = ADC2. */
+	const int  InputVoltPort  		= 2;
+	const int  OutputCurrentPin 	= PC0;		/* Output current, PC0 = ADC0. */
+	const int  OutputCurrentPort 	= 2;
+	const int  OutputVoltPin 		= PC1;		/* Output voltage, PC1 = ADC1. */
+	const int  OutputVoltPort 		= 2;
+	const int  Pin12V 				= PC3;		/* 12 V rail, PC3 = ADC3. */
+	const int  Port12V 				= 2;
+	/* ADC 1023 maps to this Volt reading. 201 is 20.1 V, so the byte is 0.1 V per count. */
+	const int  DriverVoltFullScale	= 201;
+	const int  TemperaturePin 		= PD7;		/* MOSFET temperature pin. No sensor in this build. */
+	const int  TemperaturePort 		= 3;
+	const int  pwmPin 				= PB1;		/* PWM charge output, PB1. */
+	const int  pwmPort 				= 1;
 
-	const int  InputVoltPin  		= PC2;				// Pin used to measure Battery-volt PC2 = A2
-	const int  InputVoltPort  		= 2;				// Port used to measure Battery-volt
-	const int  OutputCurrentPin 	= PC0;				// Pin used to measure Motor-volt PC0 = A0
-	const int  OutputCurrentPort 	= 2;				// Port used to measure Motor-volt
-	const int  OutputVoltPin 		= PC1;				// Pin used  to measure output-volt PC1 = A1
-	const int  OutputVoltPort 		= 2;				// Port used to measure output-volt
-	const int  Pin12V 				= PC3;				// Pin used to measure 12 volt rail PC3 = A3
-	const int  Port12V 				= 2;				// Port used to measure 12 volt rail
-	const int  TemperaturPin 		= PD7;				// Pin used to measure mosfet-temperatur PD7 = D7
-	const int  TemperaturPort 		= 3;				// Port used to measure mosfet-temperatur
-	const int  pwmPin 				= PB1;				// Pin used for PWM-charge-output PB1 = D9
-	const int  pwmPort 				= 1;				// Port used for PWM-charge-output
+	const int  Temp_Measure_type 	= 2;		/* 1 = NTC, 2 = DS18B20. OneWire is not linked. */
+	const int  Current_Measure_type = 2;		/* Output sensor. 1 = 5 A, 2 = 20 A, 3 = 30 A. */
+	/* This board has no input-current pin. Keep the channel main already used. */
+	const int  InputCurrentPin		= 7;		/* ADC7. */
+	const int  InputCurrentPort		= 2;		/* Same port the current driver was given before. */
+	const int  InputCurrentMeasureType = 1;		/* 5 A sensor. Do not reuse Current_Measure_type. */
+	const int  RedLedPin	 		= PD5;
+	const int  RedLedPort 			= 3;
+	const int  YellowLedPin			= PD4;
+	const int  YellowLedPort		= 3;
+	const int  GreenLedPin 			= PD3;
+	const int  GreenLedPort			= 3;
+	const int  ButtonPin 			= PD2;
+	const int  ButtonPort 			= 3;
+	const uint32_t SerialBaud		= 115200;	/* Passed to sSerial by main. */
 
-	const int  Temp_Measure_type 	= 2;				// Type 1 = NTC-resistor, 2 = DS1820 temp sensor.
-	const int  Current_Measure_type = 2;				// Type 1 = 5A, 2 = 20A, 3 = 30A (Defines witch type of current sense sensor is used.
-	const int  RedLedPin	 		= PD5;				// Red LED pin
-	const int  RedLedPort 			= 3;				// Red LED port
-	const int  YellowLedPin			= PD4;				// Yellow LED pin
-	const int  YellowLedPort		= 3;				// Yellow LED port
-	const int  GreenLedPin 			= PD3;				// Green LED pin
-	const int  GreenLedPport		= 3;				// Green LED port
-	const int  ButtonPin 			= PD2;				// Button pin
-	const int  ButtonPort 			= 3;				// Button port
-	const uint32_t SerialBaud		= 115200;			// UART baud. main skickar värdet till sSerial.
-
-#endif	// SmedbyCharger11 = 1
+#endif	/* SmedbyCharger11 = 1 */
 
 #if DCC == 1
 
-// Define what pins and ports to use on the MPU
-// in reality, PD6 is really just '6'
+	const int  InputVoltPin  		= PC4;
+	const int  InputVoltPort  		= 2;
+	const int  OutputCurrentPin 	= PC1;
+	const int  OutputCurrentPort 	= 2;
+	const int  OutputVoltPin 		= PC2;
+	const int  OutputVoltPort 		= 2;
+	const int  Pin12V 				= PC3;
+	const int  Port12V 				= 2;
+	const int  DriverVoltFullScale	= 201;		/* 0.1 V per count, ADC 1023 = 20.1 V. */
+	const int  TemperaturePin 		= PD4;
+	const int  TemperaturePort 		= 3;
+	const int  pwmPin 				= PD6;
+	const int  pwmPort 				= 3;
 
-	const int  InputVoltPin  		= PC4;				// Pin used to measure inputVolt PC4 = A4
-	const int  InputVoltPort  		= 2;				// Port used to measure inputvolt
-	const int  OutputCurrentPin 	= PC1;				// Pin used to measure Output current PC1 = A1
-	const int  OutputCurrentPort 	= 2;				// Port used to measure Output current
-	const int  OutputVoltPin 		= PC2;				// Pin used  to measure output-volt PC2 = A2
-	const int  OutputVoltPort 		= 2;				// Port used to measure output-volt
-	const int  Pin12V 				= PC3;				// Pin used to measure 12 volt rail PC3 = A3
-	const int  Port12V 				= 2;				// Port used to measure 12 volt rail
-	const int  TemperaturPin 		= PD4;				// Pin used to measure mosfet-temperatur PD4 = D4
-	const int  TemperaturPort 		= 3;				// Port used to measure mosfet-temperatur
-	const int  pwmPin 				= PD6;				// Pin used for PWM-output PD6 = D6
-	const int  pwmPort 				= 3;				// Port used for PWM-output
+	const int  Temp_Measure_type 	= 2;		/* 1 = NTC, 2 = DS18B20. OneWire is not linked. */
+	const int  Current_Measure_type = 3;		/* Output sensor. 1 = 5 A, 2 = 20 A, 3 = 30 A. */
+	const int  InputCurrentPin		= 7;		/* ADC7. No separate input pin is defined for this board. */
+	const int  InputCurrentPort		= 2;
+	const int  InputCurrentMeasureType = 1;		/* 5 A sensor. */
+	const int  RedLedPin	 		= PB0;
+	const int  RedLedPort 			= 1;
+	const int  YellowLedPin			= PB1;
+	const int  YellowLedPort		= 1;
+	const int  GreenLedPin 			= PB2;
+	const int  GreenLedPort			= 1;
+	const int  ButtonPin 			= PD5;
+	const int  ButtonPort 			= 3;
 
-	const int  Temp_Measure_type 	= 2;				// Type 1 = NTC-resistor, 2 = DS1820 temp sensor.
-	const int  Current_Measure_type = 3;				// Type 1 = 5A, 2 = 20A, 3 = 30A (Defines witch type of current sense sensor is used.
-	const int  RedLedPin	 		= PB0;				// Red LED pin
-	const int  RedLedPort 			= 1;				// Red LED port
-	const int  YellowLedPin			= PB1;				// Yellow LED pin
-	const int  YellowLedPort		= 1;				// Yellow LED port
-	const int  GreenLedPin 			= PB2;				// Green LED pin
-	const int  GreenLedPport		= 1;				// Green LED port
-	const int  ButtonPin 			= PD5;				// Button pin
-	const int  ButtonPort 			= 3;				// Button port
+	const int  PotPin	 			= PD0;
+	const int  PotPort 				= 2;
+	const uint32_t SerialBaud		= 9600;
 
-	const int  PotPin	 			= PD0;				// Potentiometer pin
-	const int  PotPort 				= 2;				// Potentiometer port
-	const uint32_t SerialBaud		= 9600;				// UART baud. main skickar värdet till sSerial.
-
-#endif	// DCC = 1
+#endif	/* DCC = 1 */
 
 
 #endif /* HARDWARE_HPP_ */

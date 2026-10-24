@@ -7,7 +7,7 @@
 
 #include "sGPIO.hpp"
 
-sGPIO::sGPIO()										// defaukr constructor. Dose nothing
+sGPIO::sGPIO()										// Default constructor. Does nothing.
 {
 	pPin = 0;										// Store pin in private variable
 	pPDD = 0;										// Store PortDataDirection (1 = output) in local variable

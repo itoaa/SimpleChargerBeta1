@@ -1,6 +1,5 @@
 /*
- * Medianfilter utan hårdvaruberoende.
- * Samma gränssnitt kan användas på ESP32 och STM32.
+ * Median-style filter with no hardware dependency.
  */
 
 #ifndef SHARED_FILTER_HPP_

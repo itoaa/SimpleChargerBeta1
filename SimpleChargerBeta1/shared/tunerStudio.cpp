@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-/* Signaturer som TunerStudio matchar. Ingen avslutande nolla skickas. */
+/* TunerStudio matches these bytes. The trailing NUL is not sent. */
 static const char codeString[] = "MSII s-Charger B-1  ";
 static const char codeRev[] = "Smedby simple Charger Beta 1";
 static const char protocolVersion[] = "001";
@@ -14,7 +14,10 @@ TunerStudio::TunerStudio()
 	: state(Idle), pendingOffset(0), pendingCount(0), sendFn(0), sendCtx(0), burnFn(0), burnCtx(0)
 {
 	memset(&page1, 0, sizeof(page1));
+	/* Small duty after reset. OCR = duty * 10, so 5 is not half scale. */
+	page1.MaxPWM = 5;
 	memset(&realtime, 0, sizeof(realtime));
+	realtime.pulseWidth = page1.MaxPWM;
 }
 
 void TunerStudio::setSend(void (*send)(const uint8_t* data, uint8_t len, void* ctx), void* ctx)
@@ -56,7 +59,7 @@ void TunerStudio::handleCommand(uint8_t command)
 		break;
 	case 'c':
 	case 'C':
-		/* Ett rått byte, inte ASCII. */
+		/* One raw byte, not ASCII. */
 		seconds = realtime.seconds;
 		sendBytes(&seconds, 1);
 		break;
@@ -107,7 +110,7 @@ void TunerStudio::onByte(uint8_t byte)
 		return;
 	case XCount:
 		pendingCount = byte;
-		/* count 0 är ett tomt block. */
+		/* A count of 0 is an empty block. */
 		state = (pendingCount == 0) ? Idle : XData;
 		return;
 	case XData:

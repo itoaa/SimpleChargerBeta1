@@ -5,7 +5,7 @@
       "includePath": [
         "${workspaceFolder}/SimpleChargerBeta1/shared",
         "${workspaceFolder}/SimpleChargerBeta1/SmeOS/Atmel328p/include",
-        "${workspaceFolder}/SimpleChargerBeta1/SmeOS/MidleWare/include"
+        "${workspaceFolder}/SimpleChargerBeta1/SmeOS/Middleware/include"
       ],
       "defines": [
         "F_CPU=16000000UL",

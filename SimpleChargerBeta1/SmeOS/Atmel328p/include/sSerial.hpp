@@ -1,7 +1,5 @@
 /*
- * sSerial.hpp
- *
- * UART. Hastigheten kommer från anroparen. Mottagna byte hamnar i en ringbuffert.
+ * UART. The caller chooses the baud rate. Received bytes sit in a ring buffer.
  */
 
 #ifndef SMEOS_ATMEL328P_INCLUDE_SSERIAL_HPP_
@@ -17,8 +15,8 @@ class sSerial
   public:
 	sSerial();
 	void init(uint32_t baud);
-	bool dataRecived();
-	/* false när bufferten är tom. */
+	bool dataReceived();
+	/* False when the ring is empty. */
 	bool readByte(uint8_t* out);
 	void putChar(uint8_t c);
 };

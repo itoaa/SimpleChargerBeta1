@@ -7,7 +7,7 @@
 
 #include "sADC.hpp"
 
-/* Minsta delning som håller ADC-klockan på högst 200 kHz. */
+/* Smallest divider that keeps the ADC clock at or below 200 kHz. */
 static uint8_t adcPrescalerBits(void)
 {
 	const uint16_t divs[7] = { 2, 4, 8, 16, 32, 64, 128 };
@@ -52,7 +52,7 @@ void 	sADC::init(uint8_t port, uint8_t pin)				// Pin and port.  1 = PortB, 2 = 
 	pPort = port;									// 1 = PortB, 2 = PortC, 3 = PortD
 	pValue = 0;										// Set default value to 0
 	setInput();
-	/* Digital buffert av på ADC0-5, och komparatorn av. Ersätter FreeRTOS idle-hooken. */
+	/* Digital buffers on ADC0-5 add noise. The comparator is unused. */
 	DIDR0 = 0x3F;
 	ACSR &= ~_BV(ACIE);
 	ACSR |= _BV(ACD);
@@ -161,7 +161,7 @@ void 	sADC::setADCRef(uint8_t ref)
 	if(ref == VCC_REF)
 	{
 		tempADMUX &= ~0xC0;				// clear REFS0, REFS1 and REFS2 bits of ADMUX
-		tempADMUX |= _BV(REFS0);		// Use external capacitor on ARef, USe Vcc as reference
+		tempADMUX |= _BV(REFS0);		// External capacitor on ARef, Vcc as the reference.
 	}
 	if(ref == INTERNAL_REF)
 	{
