@@ -7,6 +7,30 @@
 
 #include "sADC.hpp"
 
+/* Minsta delning som håller ADC-klockan på högst 200 kHz. */
+static uint8_t adcPrescalerBits(void)
+{
+	const uint16_t divs[7] = { 2, 4, 8, 16, 32, 64, 128 };
+	const uint8_t bits[7] = {
+		(1 << ADPS0),
+		(1 << ADPS1),
+		(uint8_t)((1 << ADPS1) | (1 << ADPS0)),
+		(1 << ADPS2),
+		(uint8_t)((1 << ADPS2) | (1 << ADPS0)),
+		(uint8_t)((1 << ADPS2) | (1 << ADPS1)),
+		(uint8_t)((1 << ADPS2) | (1 << ADPS1) | (1 << ADPS0))
+	};
+
+	for (uint8_t i = 0; i < 7; i++)
+	{
+		if ((F_CPU / divs[i]) <= 200000UL)
+		{
+			return bits[i];
+		}
+	}
+	return bits[6];
+}
+
 sADC::sADC(uint8_t port, uint8_t pin)						// Pin and port.  1 = PortB, 2 = PortC, 3 = portD
 {
 	pPin = pin;										// Store pin in private variable
@@ -93,14 +117,7 @@ void 	sADC::startADC(uint8_t channel)
 		return;
 	}
 
-	ADCSRA = _BV(ADEN) | _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
-						// bit 7 set: ADC enabled (ADEN)
-						// bit 6 clear: don't start conversion
-						// bit 5 clear: disable autotrigger
-						// bit 4: ADC interrupt flag (ADIF)
-						// bit 3 clear: disable ADC interrupt (ADIE)
-						// bits 0-2 set: ADC clock prescaler is 128 (ADPS0 ADPS1 ADPS2)
-						//  128 prescaler required for 10-bit resolution when FCPU = 20 MHz
+	ADCSRA = (uint8_t)(_BV(ADEN) | adcPrescalerBits());
 
 	uint8_t tempADMUX = ADMUX;
 

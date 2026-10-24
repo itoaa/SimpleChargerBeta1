@@ -51,7 +51,7 @@ int main()
 	myPwm.setDuty(0);
 
 	sSerial serial;
-	serial.init();
+	serial.init(SerialBaud);
 
 	TunerStudio tune;
 	tune.setSend(uartSend, &serial);

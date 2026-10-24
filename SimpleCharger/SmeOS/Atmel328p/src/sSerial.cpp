@@ -7,11 +7,17 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-/* Hastigheten den tidigare binären programmerade. F_CPU sätts av bygget. */
-#define BAUD 115200
-#define USE_2X
-#define BAUD_TOL 4
-#include <util/setbaud.h>
+/* Avvikelse mellan önskad och verklig baud. u2x är 0 eller 1. */
+static uint32_t baudError(uint32_t baud, uint16_t ubrr, uint8_t u2x)
+{
+	uint32_t divisor = (uint32_t)(16UL >> u2x) * ((uint32_t)ubrr + 1UL);
+	uint32_t actual = F_CPU / divisor;
+	if (actual > baud)
+	{
+		return actual - baud;
+	}
+	return baud - actual;
+}
 
 #define RX_SIZE 64
 
@@ -35,21 +41,50 @@ sSerial::sSerial()
 {
 }
 
-void sSerial::init(void)
+void sSerial::init(uint32_t baud)
 {
-	uartInit();
+	uartInit(baud);
 }
 
-void sSerial::uartInit(void)
+void sSerial::uartInit(uint32_t baud)
 {
-	UBRR0H = UBRRH_VALUE;
-	UBRR0L = UBRRL_VALUE;
+	if (baud == 0)
+	{
+		return;
+	}
 
-#ifdef USE_2X
-	UCSR0A |= _BV(U2X0);
-#else
-	UCSR0A &= ~(_BV(U2X0));
-#endif
+	/* Samma avrundning som setbaud.h, med och utan dubbel hastighet. */
+	uint32_t normal = (F_CPU + 8UL * baud) / (16UL * baud);
+	uint32_t doubled = (F_CPU + 4UL * baud) / (8UL * baud);
+	uint32_t ubrrNormal = (normal > 0UL) ? (normal - 1UL) : 0UL;
+	uint32_t ubrrDouble = (doubled > 0UL) ? (doubled - 1UL) : 0UL;
+	if (ubrrNormal > 4095UL)
+	{
+		ubrrNormal = 4095UL;
+	}
+	if (ubrrDouble > 4095UL)
+	{
+		ubrrDouble = 4095UL;
+	}
+
+	uint16_t ubrr = (uint16_t)ubrrNormal;
+	uint8_t u2x = 0;
+	if (baudError(baud, (uint16_t)ubrrDouble, 1) < baudError(baud, ubrr, 0))
+	{
+		ubrr = (uint16_t)ubrrDouble;
+		u2x = 1;
+	}
+
+	if (u2x)
+	{
+		UCSR0A |= _BV(U2X0);
+	}
+	else
+	{
+		UCSR0A &= ~_BV(U2X0);
+	}
+	UBRR0H = (uint8_t)(ubrr >> 8);
+	UBRR0L = (uint8_t)ubrr;
 
 	UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
 	UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0);

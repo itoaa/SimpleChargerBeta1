@@ -9,6 +9,7 @@
 #define HARDWARE_HPP_
 
 #include <avr/io.h>
+#include <stdint.h>
 
 // Define for witch hardware to compile
 #define SmedbyCharger11				1
@@ -45,6 +46,7 @@
 	const int  GreenLedPport		= 3;				// Green LED port
 	const int  ButtonPin 			= PD2;				// Button pin
 	const int  ButtonPort 			= 3;				// Button port
+	const uint32_t SerialBaud		= 115200;			// UART baud. main skickar värdet till sSerial.
 
 #endif	// SmedbyCharger11 = 1
 
@@ -79,6 +81,7 @@
 
 	const int  PotPin	 			= PD0;				// Potentiometer pin
 	const int  PotPort 				= 2;				// Potentiometer port
+	const uint32_t SerialBaud		= 9600;				// UART baud. main skickar värdet till sSerial.
 
 #endif	// DCC = 1
 
