@@ -1,89 +1,78 @@
 /*
  * sSerial.cpp
- *
- *  Created on: 10 nov. 2018
- *      Author: Ola Andersson
  */
 
 #include "sSerial.hpp"
-extern "C" {
 
-int uartPutChar(char c, FILE *stream) {
-    if (c == '\n') {
-        uartPutChar('\r', stream);
-    }
-    loop_until_bit_is_set(UCSR0A, UDRE0);
-    UDR0 = c;
-    return 0;
-}
+#include <avr/io.h>
+#include <avr/interrupt.h>
 
-int uartGetChar(FILE *stream) {
-	loop_until_bit_is_set(UCSR0A, RXC0); /* Wait until data exists. */
-	return UDR0;
-}
-}
+/* Hastigheten den tidigare binären programmerade. F_CPU sätts av bygget. */
+#define BAUD 115200
+#define USE_2X
+#define BAUD_TOL 4
+#include <util/setbaud.h>
 
-sSerial::sSerial(int baud)							// set baurrate
+#define RX_SIZE 64
+
+static volatile uint8_t rxBuf[RX_SIZE];
+static volatile uint8_t rxHead;
+static volatile uint8_t rxTail;
+
+ISR(USART_RX_vect)
 {
-//	#define BAUD  baud;								// Set Baud rate
-	uartInit();
+	uint8_t data = UDR0;
+	uint8_t next = (uint8_t)((rxHead + 1) & (RX_SIZE - 1));
+	/* Full buffert: släng nya byten så loopen inte blockeras. */
+	if (next != rxTail)
+	{
+		rxBuf[rxHead] = data;
+		rxHead = next;
+	}
+}
 
-	uart_str.put = uartPutChar;
-	uart_str.get = uartGetChar;
-	uart_str.flags = _FDEV_SETUP_RW;
-
-	stdout = stdin = &uart_str;
-
-//	uart_input = FDEV_SETUP_STREAM(NULL, uartGetChar, _FDEV_SETUP_READ);
-
-};
-sSerial::sSerial()							// set baurrate
+sSerial::sSerial()
 {
-//	#define BAUD  baud;								// Set Baud rate
+}
 
-//	uart_input = FDEV_SETUP_STREAM(NULL, uartGetChar, _FDEV_SETUP_READ);
-};
-
-void sSerial::init(int baud)
+void sSerial::init(void)
 {
 	uartInit();
-
-	uart_str.put = uartPutChar;
-	uart_str.get = uartGetChar;
-	uart_str.flags = _FDEV_SETUP_RW;
-
-	stdout = stdin = &uart_str;
-
 }
-void		sSerial::uartInit(void)
-{
-    UBRR0H = UBRRH_VALUE;
-    UBRR0L = UBRRL_VALUE;
 
-#if USE_2X
-    UCSR0A |= _BV(U2X0);
+void sSerial::uartInit(void)
+{
+	UBRR0H = UBRRH_VALUE;
+	UBRR0L = UBRRL_VALUE;
+
+#ifdef USE_2X
+	UCSR0A |= _BV(U2X0);
 #else
-    UCSR0A &= ~(_BV(U2X0));
+	UCSR0A &= ~(_BV(U2X0));
 #endif
 
-    UCSR0C = _BV(UCSZ01) | _BV(UCSZ00); /* 8-bit data */
-    UCSR0B = _BV(RXEN0) | _BV(TXEN0);   /* Enable RX and TX */
+	UCSR0C = _BV(UCSZ01) | _BV(UCSZ00);
+	UCSR0B = _BV(RXEN0) | _BV(TXEN0) | _BV(RXCIE0);
 }
 
 bool sSerial::dataRecived()
 {
-	if ((UCSR0A & (1 << RXC0)) == 0) return 0;
-	else return 1;
+	return rxHead != rxTail;
 }
 
+bool sSerial::readByte(uint8_t* out)
+{
+	if (rxHead == rxTail)
+	{
+		return false;
+	}
+	*out = rxBuf[rxTail];
+	rxTail = (uint8_t)((rxTail + 1) & (RX_SIZE - 1));
+	return true;
+}
 
-void	sSerial::putChar(uint8_t c)					// Send one char to the serial
+void sSerial::putChar(uint8_t c)
 {
 	loop_until_bit_is_set(UCSR0A, UDRE0);
 	UDR0 = c;
-}
-uint8_t sSerial::getChar()							// Get one char from the serial
-{
-	loop_until_bit_is_set(UCSR0A, RXC0); /* Wait until data exists. */
-	return UDR0;
 }

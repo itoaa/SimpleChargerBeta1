@@ -13,7 +13,6 @@
 #ifndef SMEOS_MIDLEWARE_INCLUDE_SCURRENT_HPP_
 #define SMEOS_MIDLEWARE_INCLUDE_SCURRENT_HPP_
 
-#include "sFilter.hpp"
 #include "sADC.hpp"
 
 class Current

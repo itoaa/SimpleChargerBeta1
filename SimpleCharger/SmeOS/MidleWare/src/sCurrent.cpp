@@ -6,6 +6,8 @@
  */
 
 #include "sCurrent.hpp"
+#include "filter.hpp"
+#include "scale.hpp"
 
 Current::Current(int pin, int ACS712_type)
 {
@@ -30,25 +32,15 @@ int Current::readCurrent(void)
  //       mAperADC = 73.2422;                           // 73.2422mA per ADC tick.
     else {}
 
-    double Voltage = 0;
-    double Amps = 0;
-    int milliAmps = 0;
-
- 	Filter rawValue(13);                                                    // Setuf filter with 13 positions
- 	for(int i=0;i<13;i++)                                               // Fill Filter buffer with reads.
+ 	Filter rawValue(13);
+ 	for(int i=0;i<13;i++)
  	{
-	 	//		volt.addValue(map(analogRead(panalogIn),0,1023,0,pmaxVolt));      // Read ADC-Value, remap to 0 to pmaxVolt and put in to filter buffer
-		pLastADCValue = pADCPin.ADCRead(pAnalogIn);		// Read ADC-Value
-	 	rawValue.addValue(pLastADCValue);       // Put in to filter buffer
+		pLastADCValue = pADCPin.ADCRead(pAnalogIn);
+	 	rawValue.addValue(pLastADCValue);
  	}
 
-      pLastFilteredADCValue = rawValue.getFilteredValue();             // Get aveage value
-      Voltage = (pLastFilteredADCValue / 1023.0) * pRefVoltage;
-      Amps = ((Voltage - pACOffset) / mVperAmp );
-
-      milliAmps = (int)(Amps * 1000.0);
-//	  if (milliAmps < 0) { milliAmps = 0; }
-      return (milliAmps);
+      pLastFilteredADCValue = rawValue.getFilteredValue();
+      return scaleAcs712Ma((uint16_t)pLastFilteredADCValue, pRefVoltage, pACOffset, mVperAmp);
 //	  return (pLastFilteredADCValue);
 }
 

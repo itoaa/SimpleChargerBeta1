@@ -18,7 +18,6 @@
 #ifndef SMEOS_MIDLEWARE_INCLUDE_SVOLT_HPP_
 #define SMEOS_MIDLEWARE_INCLUDE_SVOLT_HPP_
 
-#include "sFilter.hpp"
 #include "stdlib.h"
 #include "sADC.hpp"
 

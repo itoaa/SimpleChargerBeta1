@@ -46,11 +46,6 @@
 	const int  ButtonPin 			= PD2;				// Button pin
 	const int  ButtonPort 			= 3;				// Button port
 
-#if Serial == 1
-// Serialport settings
-#define cBaudRate  38400
-#endif // Serial = 1
-
 #endif	// SmedbyCharger11 = 1
 
 #if DCC == 1
@@ -84,11 +79,6 @@
 
 	const int  PotPin	 			= PD0;				// Potentiometer pin
 	const int  PotPort 				= 2;				// Potentiometer port
-
-#if Serial == 1
-// Serialport settings
-#define cBaudRate  9600
-#endif // Serial = 1
 
 #endif	// DCC = 1
 

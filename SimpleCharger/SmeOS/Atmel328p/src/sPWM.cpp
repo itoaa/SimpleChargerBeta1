@@ -30,17 +30,28 @@ sPWM::sPWM(int port, int pin)						// port, 1 = PortB, 2 = PortC, 3 = portD
 
 void	sPWM::setDuty(double duty)
 {
-	if (pPort == 1)
+	/* Samma skala som den gamla raden OCR1A = MaxPWM * 10. */
+	setDutyValue((int)(duty * 10.0));
+}
+
+void	sPWM::setDutyValue(int value)
+{
+	if (value < 0)
 	{
-//		set_input(DDRB,pPin);						// Set pin as input
+		value = 0;
 	}
-	if (pPort == 2)
+	/* Timer 0 är 1 ms-tick, så PD5/PD6 lämnas orörda. */
+	if (pPort == 1 && pPin == 1)
 	{
-//		set_input(DDRC,pPin);						// Set pin as input
+		OCR1A = (uint16_t)value;
 	}
-	if (pPort == 3)
+	else if (pPort == 1 && pPin == 2)
 	{
-//		set_input(DDRD,pPin);						// Set pin as input
+		OCR1B = (uint16_t)value;
+	}
+	else if (pPort == 1 && pPin == 3)
+	{
+		OCR2A = (uint8_t)value;
 	}
 }
 

@@ -9,6 +9,8 @@
 
 
 #include "sVolt.hpp"
+#include "filter.hpp"
+#include "scale.hpp"
 
 
 Volt::Volt(uint8_t pin, uint16_t MaxVolt)
@@ -44,8 +46,7 @@ uint16_t Volt::readVolt(void)
 
 
 	//return(map(analogRead(panalogIn),0,1023,0,pmaxVolt));
-	uint16_t Myretur = volt.getFilteredValue() * (pMaxVolt / 1023.0);
-	return (Myretur);
+	return scaleAdcToVolt((uint16_t)volt.getFilteredValue(), pMaxVolt);
 }
 
 

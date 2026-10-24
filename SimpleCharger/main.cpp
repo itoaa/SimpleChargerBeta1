@@ -1,120 +1,104 @@
 /*
  * main.cpp
  *
- *  Created on: 4 juli 2019
- *      Author: ola
+ * ATmega328P-laddare. En huvudloop, ingen FreeRTOS.
+ * TunerStudio-protokollet ligger i shared/ och kan anropas från en FreeRTOS-task på ett annat kort.
  */
 
-/* FreeRtos scheduler include files. */
-#include <sMegaTune.hpp>
-#include "FreeRTOS.h"
-#include "portmacro.h"
-#include "task.h"
-#include "queue.h"
-#include "semphr.h"
-
-// SmeOS include files
-
 #include "sGPIO.hpp"
-#include "sSerial.hpp"
 #include "sPWM.hpp"
 #include "sVolt.hpp"
 #include "sCurrent.hpp"
+#include "sSerial.hpp"
+#include "sMillis.hpp"
+#include "tunerStudio.hpp"
 #include "Hardware.hpp"
 
-#include <stdio.h>
+#include <avr/interrupt.h>
 
-sGPIO green(GreenLedPport,GreenLedPin,1);
-sGPIO yelow(YellowLedPort, YellowLedPin,1);
-sGPIO red(RedLedPort,RedLedPin,1);
+sGPIO green(GreenLedPport, GreenLedPin, 1);
+sGPIO yelow(YellowLedPort, YellowLedPin, 1);
+sGPIO red(RedLedPort, RedLedPin, 1);
 
+static void uartSend(const uint8_t* data, uint8_t len, void* ctx)
+{
+	sSerial* serial = static_cast<sSerial*>(ctx);
+	for (uint8_t i = 0; i < len; i++)
+	{
+		serial->putChar(data[i]);
+	}
+}
 
-
-static void TaskCharger(void *pvParameters); // Main charger task
-
-
-
+static void pollSerial(sSerial& serial, TunerStudio& tune)
+{
+	uint8_t byte;
+	while (serial.readByte(&byte))
+	{
+		tune.onByte(byte);
+	}
+}
 
 int main()
 {
-//		sSerial MySerial(9600);
-//	    puts("Starting Serial...");
-//	    puts("Speed is 9600...");
-	   // Setup LED:s
-		red.setHigh();
-		green.setHigh();
-		yelow.setHigh();
+	red.setHigh();
+	green.setHigh();
+	yelow.setHigh();
 
+	millisInit();
 
-		xTaskCreate(
-			TaskCharger
-			,  (const portCHAR *)"ChargeTask" // Main charger task
-			,  296				//
-			,  NULL
-			,  3
-			,  NULL ); //
+	/* PWM igång med duty 0 innan något annat, så utgången inte flyter. */
+	sPWM myPwm(pwmPort, pwmPin);
+	myPwm.setDuty(0);
 
-		vTaskStartScheduler();
-		while (1)
+	sSerial serial;
+	serial.init();
+
+	TunerStudio tune;
+	tune.setSend(uartSend, &serial);
+
+	sei();
+
+	Current outputCurrent(OutputCurrentPin, Current_Measure_type);
+	outputCurrent.zeroAmpCallibrate();
+
+	Current inputCurrent(7, 1);
+	/* Samma paus som tidigare, men serieporten läses under tiden. */
+	while (millis() < 200)
+	{
+		pollSerial(serial, tune);
+	}
+	inputCurrent.zeroAmpCallibrate();
+
+	Volt outputVolt(OutputVoltPin, 55);
+	Volt inputVolt(InputVoltPin, 65);
+
+	uint32_t last = millis();
+	for (;;)
+	{
+		uint32_t now = millis();
+		if ((uint32_t)(now - last) >= 100)
 		{
+			last = now;
+			green.setLow();
+
+			/* int8_t är trådformatet mot befintlig ini-fil. */
+			tune.realtime.OutputVolt = (int8_t)outputVolt.readVolt();
+			tune.realtime.InputVolt = (int8_t)inputVolt.readVolt();
+			tune.realtime.InputAmp = (int8_t)(inputCurrent.readCurrent() / 100);
+			tune.realtime.OutputAmp = (int8_t)(outputCurrent.readCurrent() / 100);
+
+			if (tune.realtime.InputAmp < 0)
+			{
+				tune.realtime.InputAmp = (int8_t)(0 - tune.realtime.InputAmp);
+			}
+			if (tune.realtime.OutputAmp < 0)
+			{
+				tune.realtime.OutputAmp = (int8_t)(0 - tune.realtime.OutputAmp);
+			}
+
+			myPwm.setDuty(tune.page1.MaxPWM);
+			green.setHigh();
 		}
-}
-
-static void TaskCharger(void *pvParameters) // Main charger task
-{
-	(void) pvParameters;
-//    uint16_t IV,OV;
- //   uint16_t pot;
-//    int16_t IC,OC;
-//    uint16_t p = 100;
-    //    float IP,OP,v;
-
-    Current outputCurrent(OutputCurrentPin,Current_Measure_type);
-    outputCurrent.zeroAmpCallibrate();
-
-    Current inputCurrent(7,1);
-   	vTaskDelay( ( 200 / portTICK_PERIOD_MS ) );			// Wait until everything has started up, and then calibrate for 0 amp
-   	inputCurrent.zeroAmpCallibrate();					// Calibrate as 0 amp. Charger will still draining some current
-   													 	// but to get efficiency value more realistic, we ignore static drain.
-
-    sPWM MyPWM(pwmPort,pwmPin);
-
-    //	Volt driverVolt(Pin12V,201);
-
-    Volt outputVolt(OutputVoltPin,55);
-	Volt inputVolt(InputVoltPin,65);
-
-	Volt potVolt(PC6,3000);
-	sMegaTune MyMega(9600);
-
-	MyMega.pg1.MaxPWM = 0;
-    for(;;)
-    {
-    	green.setLow();
-//    	pot = potVolt.readVolt();
-
-    	MyMega.RPage.OutputVolt = outputVolt.readVolt() ;
-    	MyMega.RPage.InputVolt = inputVolt.readVolt() ;
-
-    	MyMega.RPage.InputAmp = inputCurrent.readCurrent() / 100;
-    	MyMega.RPage.OutputAmp = outputCurrent.readCurrent() / 100;
-
-
-    	if (MyMega.RPage.InputAmp < 0) MyMega.RPage.InputAmp = 0 - MyMega.RPage.InputAmp;
-    	if (MyMega.RPage.OutputAmp < 0) MyMega.RPage.OutputAmp = 0 - MyMega.RPage.OutputAmp;
-
-
-   		MyPWM.setDuty(MyMega.pg1.MaxPWM);
- //   	MyPWM.setDuty(p);
-    	OCR1A = MyMega.pg1.MaxPWM * 10;
-
-    	MyMega.processSerial();
-    	green.setHigh();
-
-    	vTaskDelay( ( 100 / portTICK_PERIOD_MS ) );
-
-
-   } // for loop ??
-
-
+		pollSerial(serial, tune);
+	}
 }

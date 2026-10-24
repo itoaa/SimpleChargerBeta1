@@ -28,6 +28,10 @@ void 	sADC::init(uint8_t port, uint8_t pin)				// Pin and port.  1 = PortB, 2 = 
 	pPort = port;									// 1 = PortB, 2 = PortC, 3 = PortD
 	pValue = 0;										// Set default value to 0
 	setInput();
+	/* Digital buffert av på ADC0-5, och komparatorn av. Ersätter FreeRTOS idle-hooken. */
+	DIDR0 = 0x3F;
+	ACSR &= ~_BV(ACIE);
+	ACSR |= _BV(ACD);
 }
 
 
