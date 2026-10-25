@@ -186,6 +186,52 @@ static void testDefaults()
     CHECK(scGetU16le(&p5[45]) == 3960U && scGetU16le(&p5[47]) == 300U);
 }
 
+/* Tabellforslagen (sida 1 MOSFET-kurva, sida 4): x-axlarna strikt stigande,
+ * varden inom ini-intervallen och stickprov mot table_proposals.py. */
+static void testTableDefaults()
+{
+    g_mock.reset(0xFFU);
+    EepromStore s(mockBackend());
+    const uint8_t* p1 = s.page(0);
+    const uint8_t* p3 = s.page(2);
+    const uint8_t* p4 = s.page(3);
+    for (uint8_t i = 1U; i < EepromLayout::P1TableLength; ++i)
+    {
+        CHECK(p1[EepromLayout::P1MosfetTempADCTable + i] > p1[EepromLayout::P1MosfetTempADCTable + i - 1U]);
+        CHECK((int8_t)p1[EepromLayout::P1MosfetTempTable + i] < (int8_t)p1[EepromLayout::P1MosfetTempTable + i - 1U]);
+        CHECK(scGetU16le(&p4[EepromLayout::P4BatNtcADC + 2U * i]) > scGetU16le(&p4[EepromLayout::P4BatNtcADC + 2U * (i - 1U)]));
+        CHECK((int8_t)p4[EepromLayout::P4BatNtcTemp + i] < (int8_t)p4[EepromLayout::P4BatNtcTemp + i - 1U]);
+    }
+    for (uint8_t i = 0U; i < EepromLayout::P1TableLength; ++i)
+    {
+        CHECK(scGetU16le(&p4[EepromLayout::P4BatNtcADC + 2U * i]) <= 1023U);
+    }
+    /* 25 C -> halva ADC-skalan med 10k/10k */
+    CHECK(scGetU16le(&p4[EepromLayout::P4BatNtcADC + 12U]) == 512U && (int8_t)p4[EepromLayout::P4BatNtcTemp + 6U] == 25);
+    CHECK(p1[EepromLayout::P1MosfetTempADCTable + 9U] == 128U && (int8_t)p1[EepromLayout::P1MosfetTempTable + 9U] == 25);
+    for (uint8_t i = 0U; i < EepromLayout::P4DerateLength; ++i)
+    {
+        if (i > 0U)
+        {
+            CHECK((int8_t)p4[EepromLayout::P4DerateTempBins + i] > (int8_t)p4[EepromLayout::P4DerateTempBins + i - 1U]);
+            CHECK(p4[EepromLayout::P4DeratePct + i] <= p4[EepromLayout::P4DeratePct + i - 1U]);
+        }
+        CHECK(p4[EepromLayout::P4DeratePct + i] <= 100U);
+        CHECK((int8_t)p4[EepromLayout::P4DerateTempBins + i] <= 125);
+    }
+    /* Deratering borjar vid derateStartTemp (sida 3 offset 7) med 100 % */
+    CHECK((int8_t)p4[EepromLayout::P4DerateTempBins] == (int8_t)p3[7] && p4[EepromLayout::P4DeratePct] == 100U);
+    for (uint8_t i = 0U; i < EepromLayout::P4AmpTimeLength; ++i)
+    {
+        if (i > 0U)
+        {
+            CHECK(scGetU16le(&p4[EepromLayout::P4AmpTimeBins + 2U * i]) > scGetU16le(&p4[EepromLayout::P4AmpTimeBins + 2U * (i - 1U)]));
+        }
+        /* aldrig over hardvarutaket 15,00 A */
+        CHECK(scGetU16le(&p4[EepromLayout::P4AmpTimeLimit + 2U * i]) == 1500U);
+    }
+}
+
 static void testBlankAndOldEeprom()
 {
     /* Tomt EEPROM (0xFF) */
@@ -439,6 +485,7 @@ int main()
     testLayout();
     testByteHelpers();
     testDefaults();
+    testTableDefaults();
     testBlankAndOldEeprom();
     testRoundTrip();
     testCorruptPage();

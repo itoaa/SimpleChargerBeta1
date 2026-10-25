@@ -4,12 +4,18 @@
 Oberoende kontroll av shared/eepromDefaults.cpp: standardvardena raknas har
 fram direkt ur ini-filens [Constants] och defaultValue-rader (raw = varde /
 skala - translate, bits = index i alternativlistan, falt utan defaultValue = 0).
+Arrayer utan defaultValue far FORSLAG fran table_proposals.py (beraknade i
+Python, oberoende av C++-tabellen). Ini-filen andras inte.
 
 Anvandning:  python3 gen_defaults_golden.py <SmedbyCharger_v2.2.ini> > golden_defaults.inc
 (ini-filen ligger i LTT-Swedens Drive-mapp, inte i repot.)
 """
+import os
 import re
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from table_proposals import proposals  # noqa: E402
 
 SIZES = {1: 38, 2: 84, 3: 38, 4: 68, 5: 64}
 TYPES = {"U08": (1, False), "S08": (1, True), "U16": (2, False), "S16": (2, True)}
@@ -44,12 +50,24 @@ def main(path):
             if m:
                 defaults[m.group(1)] = m.group(2).strip()
 
+    prop = proposals()
     pages = {p: bytearray(n) for p, n in SIZES.items()}
     for name, (page, kind, f) in fields.items():
         typ, off = f[0], int(f[1])
         size, signed = TYPES[typ]
         if name not in defaults:
-            continue  # ingen defaultValue -> 0
+            if kind == "array" and name in prop:
+                n = int(re.match(r"\[(\d+)\]", f[2]).group(1))
+                vals = prop[name]
+                assert len(vals) == n, name
+                scale, translate = float(f[4]), float(f[5])
+                lo, hi = float(f[6]), float(f[7])
+                for i, v in enumerate(vals):
+                    shown = (v + translate) * scale
+                    assert lo <= shown <= hi, "%s[%d] utanfor ini-intervallet" % (name, i)
+                    pos = off + i * size
+                    pages[page][pos:pos + size] = int(v).to_bytes(size, "little", signed=signed)
+            continue  # ingen defaultValue och inget forslag -> 0
         dv = defaults[name]
         if kind == "bits":
             lo, hi = [int(x) for x in re.match(r"\[(\d+):(\d+)\]", f[2]).groups()]
@@ -65,13 +83,15 @@ def main(path):
             raise SystemExit("array-default stods inte: " + name)
     for name in defaults:
         assert name in fields, "defaultValue for okant falt: " + name
+    for name in prop:
+        assert name in fields and name not in defaults, "forslag for okant/redan satt falt: " + name
     out = []
     for p in sorted(pages):
         out.append("/* sida %d (%d B) */" % (p, SIZES[p]))
         b = pages[p]
         for i in range(0, len(b), 16):
             out.append(" ".join("0x%02X," % x for x in b[i:i + 16]))
-    print("/* Genererad av gen_defaults_golden.py fran SmedbyCharger_v2.2.ini - andra inte for hand. */")
+    print("/* Genererad av gen_defaults_golden.py fran SmedbyCharger_v2.2.ini + table_proposals.py - andra inte for hand. */")
     print("\n".join(out))
 
 

@@ -75,10 +75,20 @@ const uint16_t P1MaxInputAmp        = 8U;   /* U16 0,01 A */
 const uint16_t P1MaxPWM             = 10U;  /* U08 steg */
 const uint16_t P1MinPWM             = 11U;  /* U08 steg */
 const uint16_t P1MaxTemp            = 12U;  /* U08 C */
-const uint16_t P1AccelerationDelay  = 13U;  /* U08, enhet oklar (se PR) */
-const uint16_t P1MosfetTempADCTable = 14U;  /* U08[12] */
+const uint16_t P1AccelerationDelay  = 13U;  /* U08, raa x 10 = ms (beslut 6: enhet ms, skala 10) */
+const uint16_t P1MosfetTempADCTable = 14U;  /* U08[12], enhet ADC/4 (10-bit ADC >> 2, beslut 6) */
 const uint16_t P1MosfetTempTable    = 26U;  /* S08[12] */
 const uint16_t P1TableLength        = 12U;
+
+/* ---- Sida 4 (index 3): tabeller --------------------------------------- */
+const uint16_t P4BatNtcADC      = 0U;   /* U16[12] ADC 10 bit */
+const uint16_t P4BatNtcTemp     = 24U;  /* S08[12] C */
+const uint16_t P4DerateTempBins = 36U;  /* S08[6] C */
+const uint16_t P4DeratePct      = 42U;  /* U08[6] % */
+const uint16_t P4AmpTimeBins    = 48U;  /* U16[5] s */
+const uint16_t P4AmpTimeLimit   = 58U;  /* U16[5] 0,01 A */
+const uint16_t P4DerateLength   = 6U;
+const uint16_t P4AmpTimeLength  = 5U;
 
 /* ---- Sida 3 (index 2): diagnoslage ------------------------------------ */
 /* diagMode = bits [0:1] i byte 16. Far aldrig overleva en omstart. */
@@ -100,6 +110,7 @@ typedef char eepromTotalIs308[(EepromLayout::TotalSize == 308U) ? 1 : -1];
 typedef char eepromFitsInDevice[((EepromLayout::BaseAddress + EepromLayout::TotalSize) <= EepromLayout::EepromCapacity) ? 1 : -1];
 typedef char eepromPageSizesFitU08[((EepromLayout::Page1Size | EepromLayout::Page2Size | EepromLayout::Page3Size | EepromLayout::Page4Size | EepromLayout::Page5Size) < 256U) ? 1 : -1];
 typedef char eepromP1TablesEndAtPageEnd[((EepromLayout::P1MosfetTempTable + EepromLayout::P1TableLength) == EepromLayout::Page1Size) ? 1 : -1];
+typedef char eepromP4TablesEndAtPageEnd[((EepromLayout::P4AmpTimeLimit + (2U * EepromLayout::P4AmpTimeLength)) == EepromLayout::Page4Size) ? 1 : -1];
 typedef char eepromP5EndsAtTotal[((EepromLayout::Page5Address + EepromLayout::Page5Size + EepromLayout::CrcSize) == (EepromLayout::BaseAddress + EepromLayout::TotalSize)) ? 1 : -1];
 
 /* ---- Little-endian byte-hjalpare ------------------------------------- */

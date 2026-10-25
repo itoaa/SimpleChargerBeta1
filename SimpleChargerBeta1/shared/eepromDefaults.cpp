@@ -3,9 +3,11 @@
  *
  * Standardvarden for TunerStudio v2.2 sida 1-5 (ravarden, little-endian).
  * Kalla: SPEC_tabeller_v2.2.md och defaultValue i SmedbyCharger_v2.2.ini.
- * Falt utan angivet standardvarde = 0 (bl.a. alla tabeller pa sida 1 och 4).
- * Testet test/test_eeprom.cpp jamfor byte for byte mot golden_defaults.inc,
- * som genereras direkt ur ini-filen.
+ * Skalara falt utan angivet standardvarde = 0 (enligt specen).
+ * Tabellerna pa sida 1 (MOSFET-kurva) och sida 4 saknar defaultValue i ini;
+ * har star FORSLAG [U] (beraknade i test/table_proposals.py, se
+ * docs/eeprom-layout.md). Testet test/test_eeprom.cpp jamfor byte for byte
+ * mot golden_defaults.inc, som genereras ur ini-filen + table_proposals.py.
  */
 #include "eepromStore.hpp"
 
@@ -25,9 +27,12 @@ const uint8_t eepromDefaults[EepromLayout::PagesTotalSize] SC_PROGMEM =
     5U,             /* 10 MaxPWM */
     0U,             /* 11 MinPWM */
     0U,             /* 12 MaxTemp (0 = av) */
-    0U,             /* 13 accelerationDelay */
-    Z12,            /* 14 mosfetTempADCTable[12] */
-    Z12,            /* 26 mosfetTempTable[12] */
+    0U,             /* 13 accelerationDelay (x10 ms) */
+    /* 14 mosfetTempADCTable[12], ADC/4. FORSLAG [U]: NTC 10k/B3950, 10k pull-up */
+    8U, 12U, 16U, 21U, 28U, 38U, 51U, 67U, 88U, 128U, 197U, 233U,
+    /* 26 mosfetTempTable[12], C. FORSLAG [U] */
+    S08(125), S08(110), S08(100), S08(90), S08(80), S08(70),
+    S08(60), S08(50), S08(40), S08(25), S08(0), S08(-20),
 
     /* ---- Sida 2 (84 B) ---- */
     0x04U,          /*  0 startMode=Manuell(0), restartMode=Omstart(bit2) */
@@ -68,13 +73,21 @@ const uint8_t eepromDefaults[EepromLayout::PagesTotalSize] SC_PROGMEM =
     U16LE(10000), U16LE(0),   /* 30 calInAmp */
     U16LE(10000), U16LE(0),   /* 34 calDriver */
 
-    /* ---- Sida 4 (68 B): inga standardvarden i spec/ini -> 0 ---- */
-    Z12, Z12,       /*  0 batNtcADC U16[12] */
-    Z12,            /* 24 batNtcTemp S08[12] */
-    0U, 0U, 0U, 0U, 0U, 0U,  /* 36 derateTempBins S08[6] */
-    0U, 0U, 0U, 0U, 0U, 0U,  /* 42 deratePct U08[6] */
-    Z4, Z4, 0U, 0U,          /* 48 ampTimeBins U16[5] */
-    Z4, Z4, 0U, 0U,          /* 58 ampTimeLimit U16[5] */
+    /* ---- Sida 4 (68 B): inga standardvarden i spec/ini -> FORSLAG [U] ---- */
+    /*  0 batNtcADC U16[12], 10 bit. NTC 10k/B3950, 10k pull-up [U] */
+    U16LE(204), U16LE(270), U16LE(310), U16LE(355), U16LE(404), U16LE(456),
+    U16LE(512), U16LE(570), U16LE(685), U16LE(789), U16LE(874), U16LE(935),
+    /* 24 batNtcTemp S08[12], C */
+    S08(60), S08(50), S08(45), S08(40), S08(35), S08(30),
+    S08(25), S08(20), S08(10), S08(0), S08(-10), S08(-20),
+    /* 36 derateTempBins S08[6], C (start = derateStartTemp 70) */
+    S08(70), S08(80), S08(90), S08(100), S08(110), S08(120),
+    /* 42 deratePct U08[6], % */
+    100U, 80U, 60U, 40U, 20U, 0U,
+    /* 48 ampTimeBins U16[5], s */
+    U16LE(0), U16LE(60), U16LE(300), U16LE(900), U16LE(3600),
+    /* 58 ampTimeLimit U16[5], 0,01 A: platt 15,00 A = hardvarutaket */
+    U16LE(1500), U16LE(1500), U16LE(1500), U16LE(1500), U16LE(1500),
 
     /* ---- Sida 5 (64 B) ---- */
     0x04U,          /*  0 chargeMode=Auto(0), tempCompEnable=Pa(bit2) */

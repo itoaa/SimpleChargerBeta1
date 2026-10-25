@@ -8,3 +8,4 @@
 !charger.elf
 !charger.hex
 /test/build/
+/test/__pycache__/
