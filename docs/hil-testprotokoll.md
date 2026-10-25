@@ -138,6 +138,23 @@ Firmware håller biten i cirka 1 s (`RefreshHoldMs` 1000) efter E7/E9. Det är o
 | 10.2.3 | Logga `pageRefreshReq` i TS-loggern under E7 | Bit 0x10 är 1 i ungefär 1 s och sedan 0, och den sitter inte kvar | |
 | 10.2.4 | Om ingen omläsning sker | Reserv: stäng och öppna dialogen, eller Ctrl+R. Tryck **inte** Burn innan TS visar de nya värdena, annars skrivs de gamla tillbaka. | |
 
+### 10.3 Presentation i tunerStudio_v2.2.ini (BESLUT nr 42–44)
+
+Kan kontrolleras i TunerStudio utan laddning (offline-projekt räcker för 10.3.1–10.3.8). Inget av detta är provat.
+
+| # | Steg | Förväntat | Resultat |
+|---|---|---|---|
+| 10.3.1 | Öppna projektet med tunerStudio_v2.2.ini. Titta på enheter med grad-tecken (t.ex. Charge temp min, MaxTemp) | "°C" visas, inte "Â°" eller "?" (filen är ISO-8859-1) [U] | |
+| 10.3.2 | Menyraden | Menyerna Charger, Protection, Driver, Calibration och Diagnostics finns. Tools har "Realtime display" (std_realtime). Help har 7 poster tillagda efter TS egna | |
+| 10.3.3 | Help → varje post | Dialogen visar texten. Knappen/länken för hjälp (topicHelp) öppnar help-blocket med radbrytningar (`<br>`) [U] | |
+| 10.3.4 | Hjälpknappen i Charger max values, Auto mode, Stage 1–4, Protection, Sensors, Diagnostics | Rätt help-block öppnas [U: topicHelp mot help-namn är inte dokumenterat i specen] | |
+| 10.3.5 | Framsidan | 8 mätare och 12 indikatorer. Högerklick på en indikator listar de övriga (indicatorTemplate) [U] | |
+| 10.3.6 | Strömfält, t.ex. Stage 1 current och Manual value för bulk current | Går inte att mata in över 15,00 A | |
+| 10.3.7 | Spänningsfält, t.ex. Stage 1 voltage, och driverVoltMax | Över 55,00 V respektive 20,00 V går inte att mata in | |
+| 10.3.8 | Ladda en .msq eller EEPROM med äldre värden över de nya gränserna (t.ex. 20 A eller 58 V) | Notera hur TS visar och hanterar värdet. Firmware ändrar inte värdet [U] | |
+| 10.3.9 | Med kort: E8 (Copy effective values to stage table) med 48 V bly och MaxChargeVolt = 0 | Stegtabellen kan få 58,80 V, alltså över ini-gränsen 55 V (öppen fråga BESLUT nr 42/43). Notera hur TS visar det | |
+| 10.3.10 | Battery limits | Dialogen visar fälten och de effektiva mätarna. Ändring i Battery limits syns i Auto mode-dialogerna (samma konstanter) | |
+
 ## Ej testbart i v2.2
 
 Temperaturer (visas som 0 = ej tillgänglig), ingångsström, temperaturkompensering, SoftStart/PauseTemp och diagMode 1. Att stegtabellen *används* (chargeMode 1) är inte implementerat, men E8 fyller den (6.8). Se BESLUT nr 30, 34 och 40.

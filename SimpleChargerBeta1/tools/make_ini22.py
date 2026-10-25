@@ -28,6 +28,12 @@ hdr_add = (
 ";   * restrictionBits b10 = currentSensor andrad, omstart (E5) kravs, ingen start, BESLUT nr 39.\n"
 ";   * E8 (Kopiera effektiva -> stegtabell s1-s4): s1 bulk, s2 absorption, s3 float, s4 overvaka;\n"
 ";     forladdning foljer inte med; ignoreras vid AH_MISSING/NOMV_INVALID; ingen burn (BESLUT nr 40).\n"
+";   * Strom 0..15 A i alla stromfalt och matare (BESLUT nr 42), spanning 0..55 V och\n"
+";     driverVolt 0..20 V (BESLUT nr 43).\n"
+";   * Presentation (BESLUT nr 44, tools/ini22_ui.py): engelska texter, en teckenkodning\n"
+";     (ISO-8859-1, bara ASCII + grad-tecknet), framsida med 8 matare + 12 indikatorer,\n"
+";     ovriga indikatorer som indicatorTemplate, hjalptexter med <br>, Help-meny och\n"
+";     std_realtime. Funktioner som inte finns i firmware ar markta (not active).\n"
 "; Firmware-tolkning av %o/%c: 1 byte vardera (sidor <= 255 B). Inte testad i riktig TunerStudio.\n"
 "; Compat-filerna (tunerStudio.ini, SmedbyCharger_compat.ini) ar OFORANDRADE.\n"
 "; -------------------------------------------------------------------------------------\n")
@@ -79,4 +85,9 @@ rep('   indicator = { restrictionBits & 128 }, "Tid-strom", "BEGR: Tid-strom", w
 rep('   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n',
     '   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n'
     '   indicator = { errorBits & 4096 }, "Max Ah i bulk", "FEL: Max laddad Ah i bulk (bulkAhPct)", white, black, red, black\n')
+# Presentationssteg (BESLUT nr 42-44)
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ini22_ui
+t = ini22_ui.apply(t)
 open(dst, 'w', encoding='latin-1', newline='').write(t)

@@ -424,3 +424,50 @@ Mätare: `outAmpGauge`, `ampSetGauge`, `inAmpGauge` 0..30 → 0..20 A, varning 1
 
 **Öppen fråga:** utspänningsfälten i ini har nu 0..55 V (nr 43), men E8 klampar spänning till 6000 cV. Ett effektivt värde över 55 V (t.ex. 48 V bly, absorption 58,80 V) skrivs därför utanför ini-intervallet. Ändras inte utan Olas beslut.
 
+
+## 43. Utspänningsfält 0–55 V, driverVolt 0–20 V (2026-10-25)
+Olas beslut 2026-10-25 (punkt 4, via Max): MaxInputVolt 65 V, MaxChargeVolt 55 V, MOSFET 125 °C, utspänning 0..55 V och driverVolt 0..20 V enligt JAMFORELSE_orig_vs_v2.2.md avsnitt 3.4. Granskas av CISO tillsammans med nr 42.
+
+**tunerStudio_v2.2.ini** (bara övre gräns `hi`; typ, offset, skala, layout och standardvärden oförändrade):
+
+| Fält | Före | Efter |
+|---|---|---|
+| s1–s4 `_volt`, `_endVoltMax`, `_endVoltMin` (12 fält, sida 2) | 0..60 V | 0..55 V |
+| `man_absorbVolt`, `man_floatVolt`, `man_restartVolt`, `man_prechargeVolt`, `man_voltLimit`, `man_batteryPresentVolt` (sida 5) | 0..60 V | 0..55 V |
+| `driverVoltMin`, `driverVoltMax` (sida 3, inte aktiva) | 0..25 V | 0..20 V |
+| Oförändrade (redan rätt): `MaxChargeVolt` 0..55, `MaxInputVolt` 0..65, `minInputVolt` 0..65, `MaxTemp` 0..125 °C | – | – |
+
+**Inte ändrat:**
+- Firmware. E8 klampar fortfarande spänning till 6000 cV (60 V), se öppen fråga i nr 42. Med MaxChargeVolt = 0 (utgång av) ger 48 V bly typ 0/3/4 absorption 58,80 V och voltLimit 60,00 V (kontrollerat med ref/auto_params_v2.2.py). E8 kan då skriva värden över 55 V i stegtabellen. Med MaxChargeVolt > 0 begränsas allt till MaxChargeVolt (≤ 55 V).
+- Spänningsmätarna (effektiva/PC och outVolt) har kvar 0..60 V, eftersom effektiva värden kan vara upp till 60 V enligt ovan.
+- AutoParams, golden (44 137) och EEPROM-layout. Alla standardvärden ligger inom de nya gränserna (störst 14,70 V).
+- Ett värde över 55 V (eller 20 V) som redan finns i EEPROM ändras inte av firmware. TS visar det som utanför intervallet [U].
+
+## 44. Presentation i tunerStudio_v2.2.ini: engelska, framsida, hjälp och menyer (2026-10-25)
+Olas beslut 2026-10-25 (punkt 1, 3, 5, 6, 7, via Max). Originalets presentation tas över och förbättras enligt JAMFORELSE_orig_vs_v2.2.md. TunerStudios ini-spec är facit. Genereras av `tools/make_ini22.py` + `tools/ini22_ui.py`.
+
+**Språk och kodning:**
+- Alla etiketter, menyer, mätare, indikatorer, hjälptexter och loggrubriker är på engelska. Fält-, kanal- och dialognamn är oförändrade (engelska camelCase).
+- Undantag: alternativen för `ovr_X` är kvar som "Auto"/"Manuell". Den vendorade `test/ref/validate_ini_v2.2.py` kräver exakt de strängarna, och den filen ändras inte. Hjälptexten förklarar "Manuell (manual)".
+- En teckenkodning: ISO-8859-1. Filen innehåller bara ASCII plus grad-tecknet (0xB0). Generatorn kontrollerar detta med assert. Källans UTF-8-rester ("Â°", "–") är ersatta med "°" och "-".
+- Enheter: C → °C, celler → cells, steg → steps, mV/C/cell → mV/°C/cell, "% kap" → %, "ggr"/"x"/"st" → tomt, accelerationDelay "x10 ms" → ms (skalan 10 fanns redan, nr 15), mosfetTempADCTable "ADC" → "ADC/4" (nr 16). Inga enheter i etiketter (TS visar enheten själv).
+
+**Alternativtexter (bits):** översatta på samma position, så lagrade värden och .msq-index är oförändrade. `defaultValue` i ConstantsExtensions mappas automatiskt till samma position. Funktioner som inte finns i firmware har kvar sina alternativ (punkt 6) men märks "(not active)": chargeMode 1, diagMode 1, temperaturgivarna, tempCompEnable På. currentSensor 3 märks "(not supported)".
+
+**Framsida (punkt 5):**
+- 8 mätare: outVolt, outAmp, outPower, voltSet, inVolt, driverVolt, duty, stage.
+- 12 indikatorer: utgång på, CC, CV, batteri anslutet, stegindikatorer 0–4 (0 = `stage == 0` och statusBits b7, 1–3 = tillstånd 3 Laddar, 4 = tillstånd 4 Klar, enligt nr 31), anyError, mcvOutputOff och eepromWarnBits > 0. De tre sista har röd bakgrund.
+- Alla övriga indikatorer (alla errorBits- och restrictionBits-bitar, statusBits b3/b5/b6, autoWarnBits, eepromWarnBits per bit, lagrade fel, PC ≠ firmware, Auto/Enkel) är `indicatorTemplate` (spec kap. 16, högerklicksmenyn). Bitar som firmware aldrig sätter är märkta "(not active)".
+- `test/check_ini_layout.py` räknar nu både `indicator` och `indicatorTemplate` när Err*/Restr*-bitarna jämförs mot tsLayout.hpp. Mutationskontroll: en borttagen errorBits-mall och en felaktig restrictionBits-bit fälls.
+- Tolkning: specen beskriver `!` (röd) för fältetiketter i dialoger, inte för indikatorer. Varningsrader i dialoger har `!`, informationsrader `#`. På framsidan används röd på-färg för varningar [U].
+
+**Hjälp, dialoger och menyer (punkt 7):**
+- Hjälpblock med `<br>` mellan stycken: safetyHelp (ny, ersätter originalets "Warning"), accelerationDelayHelp (mjukstart, märkt inte aktiv), chargingStatesHelp (med cykeln och exemplet 9,00 A tills 14,40 V), autoHelp, protectionHelp, calibrationHelp och diagHelp. Texterna lovar inga funktioner som saknas i firmware. Utvecklarnoteringar (HEAD/offset) är borttagna ur SettingContextHelp, och hjälp finns för de 8 tabellerna.
+- topicHelp finns på alla dialoger med fält eller knappar.
+- dlgBasic heter "Charger max values (hardware)", har topicHelp accelerationDelayHelp och fältet minInputVolt.
+- Ny dialog dlgBatteryLimits ("Battery limits") av befintliga fält: batteryType, batteryNomVolt, capacityAh, autoAmpCap, ovr/man voltLimit, chargeTempMin/Max och totalMaxTime med effektiva mätare, samt MaxChargeVolt/MaxChargeAmp. Inga nya konstanter.
+- Menyer: &Charger, &Protection, &Driver, &Calibration, D&iagnostics. `menu = "Tools"` får std_realtime ("Realtime display"), `menu = "Help"` får en post per hjälpblock.
+- Avvikelse: Help-posterna pekar på dialoger `dlgHelp_<namn>` (texten som fältrader plus topicHelp), inte direkt på help-namnen. Specen tillåter `subMenu = helpNamn`, men den vendorade validatorn godtar bara dialog/kurva/tabell/std_* som mål. Om direkt `subMenu = helpNamn` ska användas måste validatorn uppdateras av Ola [U].
+- Alla dialognamn, villkor, kommandoknappar, kurvor, mätarnamn och loggkanaler är oförändrade. Generatorn kontrollerar detta med assert.
+
+**Inte verifierat i TunerStudio:** grad-tecknet i ISO-8859-1, `<br>`, topicHelp mot help-namn, indicatorTemplate i högerklicksmenyn, std_realtime i Tools-menyn och tillägg till Help-menyn. Se docs/hil-testprotokoll.md.

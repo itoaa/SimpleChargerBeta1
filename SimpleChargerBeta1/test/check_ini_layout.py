@@ -80,13 +80,14 @@ for i, k in enumerate(('Page1Size', 'Page2Size', 'Page3Size', 'Page4Size', 'Page
 
 # Bitar i errorBits/restrictionBits (hex-konstanter Err*/Restr*) mot ini-indikatorerna
 # { errorBits & N } / { restrictionBits & N }. Fangar b12 bulkAhPct (BESLUT nr 36)
-# och b8 burn avvisad (BESLUT nr 35).
+# och b8 burn avvisad (BESLUT nr 35). Bade indicator och indicatorTemplate raknas
+# (BESLUT nr 44: de flesta bitindikatorer ligger i hogerklicksmenyn).
 hexc = dict((m.group(1), int(m.group(2), 16)) for m in re.finditer(
     r'const\s+uint16_t\s+(\w+)\s*=\s*0x([0-9A-Fa-f]+)U', open(os.path.join(ROOT, 'shared', 'tsLayout.hpp')).read()))
 initext = open(INI, encoding='latin-1').read()
 for prefix, chan in (('Err', 'errorBits'), ('Restr', 'restrictionBits')):
     fw = sorted(v for k, v in hexc.items() if k.startswith(prefix))
-    ini = sorted(int(x) for x in re.findall(r'indicator = \{ %s & (\d+) \}' % chan, initext))
+    ini = sorted(int(x) for x in re.findall(r'indicator(?:Template)? = \{ %s & (\d+) \}' % chan, initext))
     expect('%s-bitar (indikatorer)' % chan, fw, ini)
     expect('%s-bitar unika' % chan, len(set(fw)), len(fw))
 
