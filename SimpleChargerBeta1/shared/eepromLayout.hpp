@@ -82,8 +82,8 @@ const uint16_t P1MaxInputAmp        = 8U;   /* U16 0,01 A */
 const uint16_t P1MaxPWM             = 10U;  /* U08 steg */
 const uint16_t P1MinPWM             = 11U;  /* U08 steg */
 const uint16_t P1MaxTemp            = 12U;  /* U08 C */
-const uint16_t P1AccelerationDelay  = 13U;  /* U08, raa x 10 = ms (beslut 6: enhet ms, skala 10) */
-const uint16_t P1MosfetTempADCTable = 14U;  /* U08[12], enhet ADC/4 (10-bit ADC >> 2, beslut 6) */
+const uint16_t P1AccelerationDelay  = 13U;  /* U08, raa x 10 = ms (BESLUT.md nr 15: enhet ms, skala 10) */
+const uint16_t P1MosfetTempADCTable = 14U;  /* U08[12], enhet ADC/4 (10-bit ADC >> 2, BESLUT.md nr 16) */
 const uint16_t P1MosfetTempTable    = 26U;  /* S08[12] */
 const uint16_t P1TableLength        = 12U;
 

@@ -93,7 +93,7 @@ static bool allDefaults(const EepromStore& s)
     return true;
 }
 
-/* ---- Mock for BurnGuard (beslut 2) ------------------------------------ */
+/* ---- Mock for BurnGuard (BESLUT.md nr 7) -------------------------------- */
 struct MockGuard
 {
     bool charging;          /* vad chargingActive svarar */
@@ -627,7 +627,7 @@ static void testBurnGuard()
     CHECK(g_mock.updateCalls > 0U);
     CHECK(!g_guard.outputOnDuringWrite);
     CHECK(g_guard.outputOn);
-    CHECK(s.warnBits() == 0U);                                /* beslut 5 */
+    CHECK(s.warnBits() == 0U);                                /* BESLUT.md nr 8 */
 
     /* Verifieringsfel: utgangen aterstalls anda, BurnErrorVerify */
     g_mock.reset(0xFFU);

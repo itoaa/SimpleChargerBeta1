@@ -10,7 +10,7 @@ dessa varden for falt utan defaultValue.
 
 NTC-modell [U]: 10 kOhm @ 25 C, B = 3950 K, NTC mot GND, 10 kOhm pull-up mot
 AVcc (= Vref), ADC 10 bit: adc10 = round(1024 * R / (R + Rp)), max 1023.
-MOSFET-tabellen lagras som ADC/4 (beslut 6): adc4 = adc10 >> 2.
+MOSFET-tabellen lagras som ADC/4 (BESLUT.md nr 16): adc4 = adc10 >> 2.
 
 Kor fristaende for att skriva ut tabellen:  python3 table_proposals.py
 """

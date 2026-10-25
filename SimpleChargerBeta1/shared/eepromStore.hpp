@@ -8,7 +8,7 @@
  *    standardvarden + varningsbit. diagMode tvingas till Normal. Skriver ALDRIG.
  *  - burn(): ENDA vagen till EEPROM-skrivning (TunerStudio "B"). Anvander
  *    backendens update (skriver bara andrade byte). Huvudet skrivs sist.
- *    Kraver en BurnGuard (beslut 2): avvisas om laddning pagar, annars
+ *    Kraver en BurnGuard (BESLUT.md nr 7): avvisas om laddning pagar, annars
  *    stangs utgangen fore skrivningen och aterstalls efter.
  *  - Ingen heap, ingen STL, inga virtuella funktioner.
  *
@@ -32,7 +32,7 @@ struct EepromBackend
     void* ctx;
 };
 
-/* Villkor och krokar for burn (beslut 2, 2026-10-25).
+/* Villkor och krokar for burn (BESLUT.md nr 7).
  * Firmware kopplar in dessa nar modulen kopplas in med v2.2-protokollet. */
 struct BurnGuard
 {
@@ -46,7 +46,7 @@ struct BurnGuard
     void* ctx;
 };
 
-/* Realtidsdata: forslag till ny statusbyte for EEPROM-varningarna (beslut 4).
+/* Realtidsdata: forslag till ny statusbyte for EEPROM-varningarna (BESLUT.md nr 8).
  * Laggs efter 114 B-blocket i SPEC_tabeller_v2.2.md (offset 0..113 ar fullt
  * belagda), dvs ochBlockSize 114 -> 115. Bitarna = EepromStore::warnBits().
  * Endast konstanter: protokollet/ini andras inte i denna version. */
@@ -101,7 +101,7 @@ public:
      * diagMode sparas alltid som Normal. Ordning: backend -> guard ->
      * chargingActive (avvisa) -> outputOff -> skriv + verifiera -> outputRestore.
      * Vid avvisning andras varken EEPROM, utgang eller varningsbitar.
-     * Lyckad burn nollar varningsbitarna (beslut 5). */
+     * Lyckad burn nollar varningsbitarna (BESLUT.md nr 8). */
     BurnResult burn();
 
     uint8_t warnBits() const { return warn_; }
