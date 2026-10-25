@@ -25,6 +25,7 @@ hdr_add = (
 ";   * restrictionBits b8 = B avvisad under laddning, andringar inte sparade (BESLUT nr 35).\n"
 ";   * errorBits b12 = bulkAhPct overskriden, egen bit i stallet for b9 (BESLUT nr 36).\n"
 ";   * restrictionBits b9 = strommgivaren mattad (+-32,767 A), BESLUT nr 37.\n"
+";   * restrictionBits b10 = currentSensor andrad, omstart (E5) kravs, ingen start, BESLUT nr 39.\n"
 "; Firmware-tolkning av %o/%c: 1 byte vardera (sidor <= 255 B). Inte testad i riktig TunerStudio.\n"
 "; Compat-filerna (tunerStudio.ini, SmedbyCharger_compat.ini) ar OFORANDRADE.\n"
 "; -------------------------------------------------------------------------------------\n")
@@ -63,7 +64,7 @@ ind = ("   indicator = { mcvOutputOff }, \"MaxChargeVolt satt\", \"UTGANG AV: Ma
 t = t[:anchor.end()] + ind + t[anchor.end():]
 # BESLUT nr 35/36: nya bitar i lediga delar av restrictionBits (b8) och errorBits (b12)
 rep("b6 PWM-tak, b7 tid-strom.\n   restrictionBits ",
-    "b6 PWM-tak, b7 tid-strom. FIRMWARE (BESLUT nr 35): b8 senaste B avvisad (laddning pagick) - andringar inte sparade, nollas av nasta burn. (BESLUT nr 37): b9 strommgivaren mattad +-32,767 A (matvardet klampat).\n   restrictionBits ")
+    "b6 PWM-tak, b7 tid-strom. FIRMWARE (BESLUT nr 35): b8 senaste B avvisad (laddning pagick) - andringar inte sparade, nollas av nasta burn. (BESLUT nr 37): b9 strommgivaren mattad +-32,767 A (matvardet klampat). (BESLUT nr 39): b10 stromgivartyp andrad - omstart kravs, start nekas.\n   restrictionBits ")
 rep("b10 batteri saknas/omvant, b11 strommsensor-nollfel.\n   errorBits ",
     "b10 batteri saknas/omvant, b11 strommsensor-nollfel. FIRMWARE (BESLUT nr 36): b12 max laddad Ah i bulk (bulkAhPct).\n   errorBits ")
 rep('   errorBitsGauge         = errorBits, "Felbitar", "", 0, 4095, ',
@@ -71,7 +72,8 @@ rep('   errorBitsGauge         = errorBits, "Felbitar", "", 0, 4095, ',
 rep('   indicator = { restrictionBits & 128 }, "Tid-strom", "BEGR: Tid-strom", white, black, yellow, black\n',
     '   indicator = { restrictionBits & 128 }, "Tid-strom", "BEGR: Tid-strom", white, black, yellow, black\n'
     '   indicator = { restrictionBits & 256 }, "Ingen avvisad burn", "BURN AVVISAD: laddning pagar - andringar inte sparade", white, black, yellow, black\n'
-    '   indicator = { restrictionBits & 512 }, "Strommatning ok", "STROMGIVARE MATTAD: matvardet klampat till +-32,767 A", white, black, yellow, black\n')
+    '   indicator = { restrictionBits & 512 }, "Strommatning ok", "STROMGIVARE MATTAD: matvardet klampat till +-32,767 A", white, black, yellow, black\n'
+    '   indicator = { restrictionBits & 1024 }, "Stromgivartyp = vid start", "STROMGIVARTYP ANDRAD: omstart (E5) kravs, start nekas", white, black, yellow, black\n')
 rep('   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n',
     '   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n'
     '   indicator = { errorBits & 4096 }, "Max Ah i bulk", "FEL: Max laddad Ah i bulk (bulkAhPct)", white, black, red, black\n')

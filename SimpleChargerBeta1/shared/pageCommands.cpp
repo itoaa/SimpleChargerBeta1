@@ -16,7 +16,20 @@ void autoInput(const uint8_t* page1, const uint8_t* page3, AutoParams::Input& in
 {
     in.maxChargeAmp = rdU16(page1 + EepromLayout::P1MaxChargeAmp);
     in.maxChargeVolt = rdU16(page1 + EepromLayout::P1MaxChargeVolt);
-    in.currentSensor = (uint8_t)((page3[TsLayout::P3SensorBits] >> 4) & 0x03U);
+    in.currentSensor = sensorSel(page3);
+    in.batSensor = false;   /* etapp 6 (givare) ej implementerad */
+}
+
+uint8_t sensorSel(const uint8_t* page3)
+{
+    return (uint8_t)((page3[TsLayout::P3SensorBits] >> 4) & 0x03U);
+}
+
+void autoInputBoot(const uint8_t* page1, uint8_t bootSensor, AutoParams::Input& in)
+{
+    in.maxChargeAmp = rdU16(page1 + EepromLayout::P1MaxChargeAmp);
+    in.maxChargeVolt = rdU16(page1 + EepromLayout::P1MaxChargeVolt);
+    in.currentSensor = (uint8_t)(bootSensor & 0x03U);
     in.batSensor = false;   /* etapp 6 (givare) ej implementerad */
 }
 

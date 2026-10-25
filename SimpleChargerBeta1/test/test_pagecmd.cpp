@@ -49,6 +49,24 @@ static void testAutoInput()
     CHECK(!in.batSensor);
 }
 
+/* BESLUT nr 39: givartypen fran boot-vardet, inte fran sida 3 */
+static void testAutoInputBoot()
+{
+    EepromStore s(be());
+    setup(s);
+    setU16(s.page(PageIdx1) + EepromLayout::P1MaxChargeAmp, 1200U);
+    s.page(PageIdx3)[P3SensorBits] = 0x10U;   /* sidan: 1 */
+    CHECK(PageCommands::sensorSel(s.page(PageIdx3)) == 1U);
+    s.page(PageIdx3)[P3SensorBits] = 0xFFU;
+    CHECK(PageCommands::sensorSel(s.page(PageIdx3)) == 3U);
+    AutoParams::Input in;
+    PageCommands::autoInputBoot(s.page(PageIdx1), 2U, in);
+    CHECK(in.currentSensor == 2U);
+    CHECK(in.maxChargeAmp == 1200U && in.maxChargeVolt == 1500U && !in.batSensor);
+    PageCommands::autoInputBoot(s.page(PageIdx1), 0xF1U, in);   /* bara bit 0..1 */
+    CHECK(in.currentSensor == 1U);
+}
+
 static void testE7CopiesAutoValues()
 {
     EepromStore s(be());
@@ -132,6 +150,7 @@ static void testE8AndOthersNoChange()
 int main()
 {
     testAutoInput();
+    testAutoInputBoot();
     testE7CopiesAutoValues();
     testE9ClearsOverrides();
     testE8AndOthersNoChange();

@@ -312,3 +312,29 @@ Förslag 4 i docs/forslag-2-3-4-6.md, godkänt av Ola 2026-10-25 11:48 (via Max)
   - MCV 5/9 och MCA 10.
 - **Mutationer som fälls:** utan marginal, utan spärrtid, utan hysteres, subSat utan klampning, och absCv inte kapad.
 - Inte verifierat på hårdvara.
+
+## 39. Strömgivartypen låst till boot-värdet (2026-10-25)
+Förslag 6 i docs/forslag-2-3-4-6.md, godkänt av Ola 2026-10-25 11:48 (via Max). Fullföljer nr 29 (typen läses vid uppstart).
+
+- **Låsning i main:**
+  - main sparar `gBootSensorSel` (sida 3 byte 6 bit 4..5) direkt efter `gStore.load()`.
+  - Samma värde styr `Current` (skalan) och alla omräkningar av AutoParams. Det gäller vid boot, efter sidskrivning och för E7–E9, via `PageCommands::autoInputBoot(page1, bootSensor, in)`. `hwCap` och strömmätningen hör därmed alltid ihop.
+  - `autoInput()` (läser från sidan) finns kvar för tester. `compute()` och golden-matrisen är oförändrade: test_autoparams ger fortfarande 44137 kontroller och 0 fel.
+- **Synligt:**
+  - När sidans värde skiljer sig från boot-värdet sätter `Charger::update()` **restrictionBits b10** `RestrSensorRestart` (0x0400) varje varv.
+  - Ini har en gul indikator: "STROMGIVARTYP ANDRAD: omstart (E5) kravs, start nekas".
+  - Ingen layoutändring.
+- **Start nekas:**
+  - E1 och autostart i Väntar/Klar startar inte så länge typerna skiljer sig.
+  - Timerstart väntar vid 0 kvar i stället för att starta, och startar först när typen stämmer.
+  - En laddning som redan pågår avbryts **inte**. Den använder fortfarande boot-skalan, som stämmer med mätningen. Inte heller omstart från Övervaka till steg 1 påverkas.
+  - E5 (omstart) är tillåten i vila som förut.
+- **Charger::Pages:** ny medlem `bootSensor` som main fyller i. Värdsimuleringen fyller den vid konstruktion, vilket motsvarar boot.
+- **Tester:**
+  - test_charger:
+    - Byte utan omstart: eff_bulkAmp är oförändrad, b10 är satt, E1 nekas och timern väntar.
+    - Återställt värde: b10 nollas och E1 startar.
+    - Simulerad omstart: b10 är 0 och bulk följer den nya typen.
+  - test_pagecmd: sensorSel/autoInputBoot.
+  - Mutationer som fälls: sensorOk alltid sant, ingen b10, start inte spärrad, timer inte spärrad.
+- Inte verifierat på hårdvara eller i TunerStudio.

@@ -70,6 +70,8 @@ static EepromStore gStore(sEepromBackend());
 static TunerStudio gTs(gStore);
 static Charger gCharger;
 static AutoParams::Result gAuto;
+/* currentSensor vid boot (BESLUT nr 39): styr Current och AutoParams tills omstart. */
+static uint8_t gBootSensorSel;
 
 struct AppState
 {
@@ -99,7 +101,7 @@ static void setOutput(uint8_t duty)
 static void computeAuto(void)
 {
 	AutoParams::Input in;
-	PageCommands::autoInput(gStore.page(TsLayout::PageIdx1), gStore.page(TsLayout::PageIdx3), in);
+	PageCommands::autoInputBoot(gStore.page(TsLayout::PageIdx1), gBootSensorSel, in);
 	AutoParams::compute(gStore.page(TsLayout::PageIdx5), in, gAuto);
 }
 
@@ -158,7 +160,7 @@ static void onCommand(uint8_t code, void*)
 	{
 		AutoParams::Input in;
 		uint8_t bits;
-		PageCommands::autoInput(gStore.page(TsLayout::PageIdx1), gStore.page(TsLayout::PageIdx3), in);
+		PageCommands::autoInputBoot(gStore.page(TsLayout::PageIdx1), gBootSensorSel, in);
 		bits = PageCommands::apply(code, gStore.page(TsLayout::PageIdx5), in);
 		if (bits != 0U)
 		{
@@ -212,6 +214,7 @@ int main()
 	guard.ctx = 0;
 	gStore.setBurnGuard(guard);
 	(void)gStore.load();          /* ogiltig sida -> standard + eepromWarnBits */
+	gBootSensorSel = PageCommands::sensorSel(gStore.page(TsLayout::PageIdx3));
 	computeAuto();
 
 	uint8_t* rt = gTs.realtime;
@@ -238,8 +241,7 @@ int main()
 	 * 0 = 5 A, 1 = 20 A, 2 = 30 A -> Current-typ 1..3. 3 (shunt) stods
 	 * inte av Current -> Hardware.hpp-typen anvands. */
 	const uint8_t sensorBits = gStore.page(TsLayout::PageIdx3)[TsLayout::P3SensorBits];
-	const uint8_t sensorSel = (uint8_t)((sensorBits >> 4) & 0x03U);
-	const int sensorType = (sensorSel < 3U) ? (int)sensorSel + 1 : Current_Measure_type;
+	const int sensorType = (gBootSensorSel < 3U) ? (int)gBootSensorSel + 1 : Current_Measure_type;
 	Current outputCurrent(OutputCurrentPort, OutputCurrentPin, sensorType);
 	if ((sensorBits & 0x40U) != 0U)
 	{
@@ -290,6 +292,7 @@ int main()
 			pg.p2 = gStore.page(TsLayout::PageIdx2);
 			pg.p3 = gStore.page(TsLayout::PageIdx3);
 			pg.p5 = gStore.page(TsLayout::PageIdx5);
+			pg.bootSensor = gBootSensorSel;
 			duty = gCharger.update(m, pg, gAuto, now);
 			setOutput(duty);
 

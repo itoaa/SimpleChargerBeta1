@@ -36,6 +36,9 @@ public:
         const uint8_t* p2;
         const uint8_t* p3;
         const uint8_t* p5;
+        /* currentSensor (sida 3 bit 4..5) som lastes vid boot (BESLUT nr 39).
+         * Skiljer sig sidans varde -> restrictionBits b10, ingen ny start. */
+        uint8_t bootSensor;
     };
 
     enum { AbsMaxChargeAmp = 1500U };   /* cA; 0 eller > 1500 -> 1500 */

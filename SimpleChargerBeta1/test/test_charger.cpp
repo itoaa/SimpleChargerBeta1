@@ -9,6 +9,7 @@
 #include "charger.hpp"
 #include "eepromStore.hpp"
 #include "tsLayout.hpp"
+#include "pageCommands.hpp"
 
 using namespace TsLayout;
 
@@ -40,22 +41,21 @@ struct Sim
     int32_t extraCv;     /* adderas till matt spanning */
     int32_t caPerDuty;   /* modellens strom per PWM-steg, cA (standard 100 = 1 A) */
     uint16_t inCv;
+    uint8_t bootSensor;  /* currentSensor vid "boot" (BESLUT nr 39) */
 
     explicit Sim(EepromStore& s)
         : store(&s), ch(), now(1000U), connected(true), vocBase(1200), vocMax(1436), capCAh(6000),
-          chargeCAhMs(0), forceCa(-1), forceCv(-1), forceRaw(false), rawCa(0), extraCv(0), caPerDuty(100), inCv(2000U)
+          chargeCAhMs(0), forceCa(-1), forceCv(-1), forceRaw(false), rawCa(0), extraCv(0), caPerDuty(100), inCv(2000U),
+          bootSensor(PageCommands::sensorSel(s.page(2)))
     {
         memset(&ar, 0, sizeof(ar));
     }
 
     void recompute()
     {
-        const uint8_t* p1 = store->page(0);
+        /* som main: givartypen last till boot-vardet (BESLUT nr 39) */
         AutoParams::Input in;
-        in.maxChargeAmp = scGetU16le(p1 + EepromLayout::P1MaxChargeAmp);
-        in.maxChargeVolt = scGetU16le(p1 + EepromLayout::P1MaxChargeVolt);
-        in.currentSensor = scBits(store->page(2)[P3SensorBits], 4U, 3U);
-        in.batSensor = false;
+        PageCommands::autoInputBoot(store->page(0), bootSensor, in);
         AutoParams::compute(store->page(4), in, ar);
     }
 
@@ -88,6 +88,7 @@ struct Sim
         now += dt;
         Charger::Pages pg;
         pg.p1 = store->page(0); pg.p2 = store->page(1); pg.p3 = store->page(2); pg.p5 = store->page(4);
+        pg.bootSensor = bootSensor;
         ch.update(m, pg, ar, now);
     }
 
@@ -751,6 +752,92 @@ static void testMarginTinyLimits()
     CHECK(rt16(s, RtVoltSetpoint) < 10U);
 }
 
+/* ---- Forslag 6 / BESLUT nr 39: givartyp last till boot-vardet ---- */
+static void setSensor(EepromStore& st, uint8_t sel)
+{
+    uint8_t* p3 = st.page(2);
+    p3[P3SensorBits] = (uint8_t)((p3[P3SensorBits] & ~0x30U) | ((sel & 3U) << 4));
+}
+
+/* 1: byte utan omstart -> eff_* oforandrade, b10, E1 startar inte */
+static void testSensorChangedNoRestart()
+{
+    EepromStore st(be());
+    setupStore(st, 1500U);
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 1500U);
+    setU16(st, 4, P5CapacityAh, 2000U);          /* 200 Ah -> bulk over 5 A */
+    setSensor(st, 2U);                           /* boot: 30 A */
+    Sim s(st); s.recompute();
+    const int32_t bulkBoot = s.ar.eff[AutoParams::BulkAmp];
+    /* forutsattning: givartyp 0 (5 A) skulle ge ett annat varde */
+    AutoParams::Input in0; PageCommands::autoInput(st.page(0), st.page(2), in0);
+    in0.currentSensor = 0U;
+    AutoParams::Result r0; AutoParams::compute(st.page(4), in0, r0);
+    CHECK(bulkBoot > r0.eff[AutoParams::BulkAmp]);
+
+    setSensor(st, 0U);                           /* andras i RAM, ingen omstart */
+    s.recompute();
+    CHECK(s.ar.eff[AutoParams::BulkAmp] == bulkBoot);
+    s.ch.command(1U); s.tick();
+    CHECK(s.ch.state() == StateWaiting && s.ch.duty() == 0U && !s.ch.chargingActive());
+    CHECK((rt16(s, RtRestrictionBits) & RestrSensorRestart) != 0U);
+    s.run(2000U);
+    CHECK(s.ch.state() == StateWaiting && s.ch.duty() == 0U);
+
+    /* 2: aterstall vardet -> b10 nollas och E1 startar */
+    setSensor(st, 2U);
+    s.tick();
+    CHECK((rt16(s, RtRestrictionBits) & RestrSensorRestart) == 0U);
+    s.ch.command(1U); s.tick();
+    CHECK(s.ch.state() == StateCharging);
+}
+
+/* 3: simulerad omstart med nytt varde -> b10 0, hwCap foljer nya typen */
+static void testSensorRestart()
+{
+    EepromStore st(be());
+    setupStore(st, 1500U);
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 1500U);
+    setU16(st, 4, P5CapacityAh, 2000U);
+    setSensor(st, 2U);
+    int32_t bulkOld;
+    {
+        Sim s(st); s.recompute();
+        bulkOld = s.ar.eff[AutoParams::BulkAmp];
+        setSensor(st, 0U);
+        s.tick();
+        CHECK((rt16(s, RtRestrictionBits) & RestrSensorRestart) != 0U);
+    }
+    Sim s2(st);                                   /* "boot" med typ 0 */
+    s2.recompute();
+    CHECK(s2.bootSensor == 0U);
+    CHECK(s2.ar.eff[AutoParams::BulkAmp] <= 500 && s2.ar.eff[AutoParams::BulkAmp] < bulkOld);
+    s2.tick();
+    CHECK((rt16(s2, RtRestrictionBits) & RestrSensorRestart) == 0U);
+    s2.ch.command(1U); s2.tick();
+    CHECK(s2.ch.state() == StateCharging);
+}
+
+/* Timerstart: typ andras under timern -> timern vantar vid 0, ingen start */
+static void testSensorChangedDuringTimer()
+{
+    EepromStore st(be());
+    setupStore(st, 1500U);
+    st.page(1)[P2StartBits] = (uint8_t)((st.page(1)[P2StartBits] & ~3U) | StartTimer);
+    setU16(st, 1, P2StartDelayMin, 1U);
+    setSensor(st, 1U);
+    Sim s(st); s.recompute();
+    s.ch.command(1U); s.tick();
+    CHECK(s.ch.state() == StateTimer);
+    setSensor(st, 3U);
+    s.run(90000U);
+    CHECK(s.ch.state() == StateTimer && s.ch.duty() == 0U);
+    CHECK((rt16(s, RtRestrictionBits) & RestrSensorRestart) != 0U);
+    setSensor(st, 1U);
+    s.tick();
+    CHECK(s.ch.state() == StateCharging);
+}
+
 int main()
 {
     testBootOffAndMcvZero();
@@ -770,6 +857,9 @@ int main()
     testHoldOverVolt();
     testHoldOverAmp();
     testMarginTinyLimits();
+    testSensorChangedNoRestart();
+    testSensorRestart();
+    testSensorChangedDuringTimer();
     printf("test_charger: %d kontroller, %d fel\n", g_checks, g_fails);
     return (g_fails == 0) ? 0 : 1;
 }

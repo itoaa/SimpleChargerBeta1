@@ -255,6 +255,7 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     uint8_t chargeMode;
     uint8_t startMode;
     bool restartOn;
+    bool sensorOk;
     bool ready;
     bool hardCut;
     bool atLimit;
@@ -284,6 +285,8 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     startMode = scBits(pg.p2[P2StartBits], 0U, 3U);
     restartOn = (scBits(pg.p2[P2StartBits], 2U, 1U) != 0U);
     diagMode_ = scBits(pg.p3[P3DiagMode], 0U, EepromLayout::P3DiagModeMask);
+    /* BESLUT nr 39: givartypen galler fran boot; andrad typ -> ingen ny start */
+    sensorOk = (scBits(pg.p3[P3SensorBits], 4U, 3U) == (pg.bootSensor & 0x03U));
 
     /* --- batteri och levande fel (som tidigare: inte latchande, per varv) --- */
     battery_ = (e[AutoParams::BatteryPresentVolt] > 0) &&
@@ -359,7 +362,7 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     {
         bool trigger = startReq_ ||
                        ((startMode != StartManual) && armed_ && battery_ && (state_ == StateWaiting));
-        if (trigger && ready && (errorBits() == 0U) &&
+        if (trigger && ready && sensorOk && (errorBits() == 0U) &&
             ((chargeMode != ChargeModeAuto) || battery_))
         {
             armed_ = false;
@@ -387,7 +390,7 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     if (state_ == StateTimer)
     {
         timerMs_ = (timerMs_ > dt) ? (uint32_t)(timerMs_ - dt) : 0U;
-        if (timerMs_ == 0U)
+        if ((timerMs_ == 0U) && sensorOk)   /* nr 39: vantar tills typen stammer */
         {
             beginCharge(chargeMode, m.outCv, ar);
         }
@@ -444,7 +447,7 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     else {}
 
     /* --- regulator: ett steg per varv, som tidigare --- */
-    restr_ = 0U;
+    restr_ = sensorOk ? 0U : RestrSensorRestart;
     statusBits_ = 0U;
     if (state_ == StateCharging)
     {

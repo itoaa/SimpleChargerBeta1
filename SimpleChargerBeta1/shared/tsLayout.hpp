@@ -151,6 +151,9 @@ const uint16_t RestrBurnRejected = 0x0100U;
 /* b9: stromgivarens matvarde klampat till +-32767 mA (BESLUT nr 37).
  * Levande (per matning), satts av main fran Current::saturated(). */
 const uint16_t RestrCurrentSat   = 0x0200U;
+/* b10: currentSensor pa sida 3 skiljer sig fran vardet vid boot; omstart
+ * (E5) kravs. Ingen ny start under tiden (BESLUT nr 39). Satts av Charger. */
+const uint16_t RestrSensorRestart = 0x0400U;
 
 } /* namespace TsLayout */
 
