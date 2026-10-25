@@ -14,6 +14,7 @@ BUILD     = build
 STORE_SRCS = ../shared/crc16.cpp ../shared/eepromStore.cpp ../shared/eepromDefaults.cpp
 HOST_SRCS = test_eeprom.cpp $(STORE_SRCS)
 AUTO_SRCS = test_autoparams.cpp ../shared/autoParams.cpp $(STORE_SRCS)
+PCMD_SRCS = test_pagecmd.cpp ../shared/pageCommands.cpp ../shared/autoParams.cpp $(STORE_SRCS)
 
 AVR_CXX   = avr-g++
 AVR_FLAGS = -mmcu=atmega328p -DF_CPU=16000000UL -Os -std=gnu++98 -Wall -Wextra -Werror \
@@ -25,10 +26,15 @@ AVR_SRCS  = avr_probe.cpp ../shared/crc16.cpp ../shared/eepromStore.cpp ../share
 
 all: test
 
-test: $(BUILD)/test_eeprom $(BUILD)/test_autoparams
+test: $(BUILD)/test_eeprom $(BUILD)/test_autoparams $(BUILD)/test_pagecmd
 	./$(BUILD)/test_eeprom
 	./$(BUILD)/test_autoparams
+	./$(BUILD)/test_pagecmd
 	python3 ref/auto_params_v2.2.py > /dev/null
+
+$(BUILD)/test_pagecmd: $(PCMD_SRCS) $(wildcard ../shared/*.hpp)
+	mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) $(PCMD_SRCS) -o $@
 
 $(BUILD)/golden_auto.inc: gen_auto_golden.py ref/auto_params_v2.2.py
 	mkdir -p $(BUILD)
