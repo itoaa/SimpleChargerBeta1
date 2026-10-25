@@ -40,6 +40,13 @@ public:
 
     enum { AbsMaxChargeAmp = 1500U };   /* cA; 0 eller > 1500 -> 1500 */
     enum { DutyHardMax = 25U };         /* MaxPWM-tak (ini 0..25) */
+    /* BESLUT nr 38 (forslag 4): regulatorns mal ligger under hardgransen,
+     * och efter hard brytning halls utgangen av en stund (hysteres). */
+    enum { VoltRegMarginCv = 10U };     /* malspanning <= MaxChargeVolt - 10 cV */
+    enum { AmpRegMarginCa = 20U };      /* malstrom <= MaxChargeAmp - 20 cA */
+    enum { HardCutHoldMs = 1000U };     /* minsta frantid efter hard brytning */
+    enum { VoltRearmCv = 20U };         /* aterstart kraver V < MCV - 20 cV ... */
+    enum { AmpRearmCa = 40U };          /* ... och I < MCA - 40 cA */
 
     Charger();
 
@@ -78,6 +85,7 @@ private:
     uint16_t restr_;
     uint16_t vSet_;
     uint16_t iSet_;
+    uint16_t holdMs_;       /* sparrtid efter hard brytning (nr 38), 0 = ingen */
     int16_t  compDelta_;
     uint16_t cAh_;
     uint16_t stageCAh0_;

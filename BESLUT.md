@@ -276,3 +276,39 @@ Förslag 3 i docs/forslag-2-3-4-6.md, godkänt av Ola 2026-10-25 11:48 (via Max)
   - Ny test/test_scale.cpp.
   - Mutationskontroll: den gamla double/int16-varianten fälls av sanitizern ("-41157 is outside the range of 'short int'").
 - Inte verifierat på hårdvara (ADC, givare) eller i TunerStudio.
+
+## 38. Regleringsmarginal och spärrtid efter hård brytning (2026-10-25)
+Förslag 4 i docs/forslag-2-3-4-6.md, godkänt av Ola 2026-10-25 11:48 (via Max). Besvarar den öppna frågan i nr 34. Ändringen ligger i `Charger::update()` (shared/charger.cpp), och konstanterna ligger i charger.hpp bredvid `AbsMaxChargeAmp`.
+
+- **Hårdgränsen är oförändrad:**
+  - V ≥ MaxChargeVolt → ErrOverVoltOut.
+  - I ≥ MaxChargeAmp → ErrOverAmpOut.
+  - Utgången stängs av samma varv.
+- **Regleringsmål:**
+  - `vSet_` ≤ MCV − `VoltRegMarginCv` (10 cV).
+  - `iSet_` ≤ MCA − `AmpRegMarginCa` (20 cA).
+  - Subtraktionen är mättad (`subSat`): MCV < 10 cV eller MCA < 20 cA ger mål 0, alltså utgång av, utan underflöde.
+  - Begränsningen görs varje varv under laddning, även under spärrtid, så att realtidens börvärden visar det reglerade målet.
+  - restrictionBits b0/b5 (max utström/utspänning) betyder nu "målet är begränsat av MCA − 20 / MCV − 10".
+- **Steggränser i Auto:**
+  - absCv och floatCv begränsas också till MCV − 10 cV.
+  - Bulk → absorption sker därför vid V ≥ min(absorb, MCV − 10). Annars skulle bulk aldrig nå gränsen när absorb = MCV, och laddningen skulle sluta med bulkMaxTime-fel.
+  - Det är en följd av det godkända förslaget (testfall 1: "utgången når CV vid 14,60 V") och en precisering av nr 31 ("V ≥ absorb" = det reglerade absorb-målet).
+- **Spärrtid och hysteres:**
+  - Efter hård brytning hålls duty 0 i minst `HardCutHoldMs` = 1 000 ms. Därefter krävs V < MCV − 20 cV och I < MCA − 40 cA.
+  - Ny medlem `holdMs_` (uint16_t), där 1 betyder "tiden ute, väntar på villkoret".
+  - Spärren nollas **inte** av stopp eller start, av säkerhetsskäl. Ny start under spärr ger utgång av tills spärren släpper.
+  - errorBits visar som förut det aktuella varvets fel, och latched samlar dem.
+- **Dokumenterade avvikelser:**
+  - Enkel-läget laddar till MCV − 0,10 V.
+  - Auto reglerar till MCV − 0,10 V när absorb eller float ligger närmare MCV än så. `eff_*` och golden-testerna är oförändrade.
+  - Ett batteri som vilar mellan MCV − 20 cV och MCV efter en hård brytning får ingen ny ström förrän spänningen sjunker.
+  - Marginalen förhindrar bara pendling om ett reglersteg (±1 duty per 100 ms) ger mindre ändring än 10 cV respektive 20 cA. Det är inte verifierat på hårdvara [U]. Med värdmodellens 1 A per steg slår strömgränsen fortfarande till när ChargeAmp = 0, och testet använder därför 0,1 A per steg.
+- **Tester** (test_charger):
+  - Auto med MCV = absorb = 14,70 V i 1 h: 0 ErrOverVoltOut, och CV ligger mellan 14,55 och 14,65 V.
+  - Enkel med MCV 14,40 V i 1 h: 0 brytvarv.
+  - Enkel med ChargeAmp 0: iSet = MCA − 20.
+  - Överspänning och överström: duty 0 samma varv, av mellan återstartsgränsen och målet, och exakt 10 varv av efter en brytning.
+  - MCV 5/9 och MCA 10.
+- **Mutationer som fälls:** utan marginal, utan spärrtid, utan hysteres, subSat utan klampning, och absCv inte kapad.
+- Inte verifierat på hårdvara.

@@ -34,14 +34,16 @@ struct Sim
     int32_t capCAh;      /* modellkapacitet */
     int64_t chargeCAhMs; /* laddning i cA*ms */
     int16_t forceCa;     /* >= 0: tvinga matt strom */
+    int32_t forceCv;     /* >= 0: tvinga matt spanning (fore extraCv) */
     bool forceRaw;       /* true: matt strom = rawCa (aven negativ) */
     int16_t rawCa;
     int32_t extraCv;     /* adderas till matt spanning */
+    int32_t caPerDuty;   /* modellens strom per PWM-steg, cA (standard 100 = 1 A) */
     uint16_t inCv;
 
     explicit Sim(EepromStore& s)
         : store(&s), ch(), now(1000U), connected(true), vocBase(1200), vocMax(1436), capCAh(6000),
-          chargeCAhMs(0), forceCa(-1), forceRaw(false), rawCa(0), extraCv(0), inCv(2000U)
+          chargeCAhMs(0), forceCa(-1), forceCv(-1), forceRaw(false), rawCa(0), extraCv(0), caPerDuty(100), inCv(2000U)
     {
         memset(&ar, 0, sizeof(ar));
     }
@@ -67,10 +69,11 @@ struct Sim
     Charger::Measure measure() const
     {
         Charger::Measure m;
-        int32_t ca = connected ? (int32_t)ch.duty() * 100 : 0;
+        int32_t ca = connected ? (int32_t)ch.duty() * caPerDuty : 0;
         int32_t v = connected ? voc() + (ca * 5) / 100 : (ch.duty() > 0U ? 1500 : 0);
         if (forceCa >= 0) { ca = forceCa; }
         if (forceRaw) { ca = rawCa; }
+        if (forceCv >= 0) { v = forceCv; }
         v += extraCv;
         m.outCv = (uint16_t)((v < 0) ? 0 : v);
         m.inCv = inCv;
@@ -164,24 +167,25 @@ static void testSimpleMode()
     s.tick();
     CHECK(s.ch.state() == StateCharging && s.ch.chargingActive());
     CHECK(rt8(s, RtStage) == 0U);
-    CHECK(rt16(s, RtAmpSetpoint) == 800U && rt16(s, RtVoltSetpoint) == 1500U);
+    /* nr 38: spanningsmalet ar MCV - 10 cV */
+    CHECK(rt16(s, RtAmpSetpoint) == 800U && rt16(s, RtVoltSetpoint) == 1490U);
     /* ramp ett steg per varv till 8 A (8 steg) */
     s.run(3000U);
     CHECK(s.ch.duty() >= 7U && s.ch.duty() <= 9U);
     CHECK((rt8(s, RtStatusBits) & StatusOutputOn) != 0U);
-    /* ChargeAmp 0 -> MCA (0 -> 1500) */
+    /* ChargeAmp 0 -> MCA (0 -> 1500) - 20 cA (nr 38) */
     setU16(st, 0, EepromLayout::P1ChargeAmp, 0U);
     s.tick();
-    CHECK(rt16(s, RtAmpSetpoint) == 1500U);
-    /* MCA > 1500 -> 1500 */
+    CHECK(rt16(s, RtAmpSetpoint) == 1480U);
+    /* MCA > 1500 -> 1500 - 20 */
     setU16(st, 0, EepromLayout::P1MaxChargeAmp, 3000U);
     s.tick();
-    CHECK(rt16(s, RtAmpSetpoint) == 1500U);
-    /* MCA 500 och ChargeAmp 800 -> 500 */
+    CHECK(rt16(s, RtAmpSetpoint) == 1480U);
+    /* MCA 500 och ChargeAmp 800 -> 500 - 20 */
     setU16(st, 0, EepromLayout::P1MaxChargeAmp, 500U);
     setU16(st, 0, EepromLayout::P1ChargeAmp, 800U);
     s.tick();
-    CHECK(rt16(s, RtAmpSetpoint) == 500U);
+    CHECK(rt16(s, RtAmpSetpoint) == 480U);
     /* strom 6 A >= MCA 5 A -> hard brytning, felbit, ej latchande */
     s.forceCa = 600;
     s.tick();
@@ -209,7 +213,8 @@ static void testSimpleMode()
     setU16(st, 0, EepromLayout::P1MaxChargeVolt, 0U); s.recompute();
     s.tick();
     CHECK(s.ch.state() == StateWaiting && s.ch.duty() == 0U && !s.ch.chargingActive());
-    /* E2 stoppar */
+    /* E2 stoppar (MCA 1500, ChargeAmp 8 A: ingen strombrytning i modellen) */
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 0U);
     setU16(st, 0, EepromLayout::P1MaxChargeVolt, 1500U); s.recompute();
     s.ch.command(1U); s.run(1000U);
     CHECK(s.ch.duty() > 0U);
@@ -569,6 +574,7 @@ static void testCurrentSaturation()
         setupStore(st, 1500U);
         st.page(4)[P5ModeBits] = (uint8_t)((st.page(4)[P5ModeBits] & ~3U) | ChargeModeSimple);
         setU16(st, 0, EepromLayout::P1MaxChargeAmp, 3000U);   /* -> 1500 */
+        setU16(st, 0, EepromLayout::P1ChargeAmp, 800U);
         Sim s(st); s.recompute();
         s.ch.command(1U); s.run(2000U);
         CHECK(s.ch.duty() > 0U);
@@ -577,6 +583,172 @@ static void testCurrentSaturation()
         CHECK((s.ch.errorBits() & ErrOverAmpOut) != 0U && s.ch.duty() == 0U);
         CHECK((rt16(s, RtRestrictionBits) & RestrCurrentSat) == 0U);
     }
+}
+
+/* ---- BESLUT nr 38 (forslag 4): marginal och sparrtid --------------- */
+struct RunStat { uint32_t cutRounds; uint32_t onToOff; uint32_t errV; uint32_t errA; uint16_t maxCv; uint16_t maxCa; };
+
+static RunStat runStat(Sim& s, uint32_t ms)
+{
+    RunStat r; memset(&r, 0, sizeof(r));
+    for (uint32_t t = 0U; t < ms; t += 100U)
+    {
+        const uint8_t before = s.ch.duty();
+        s.tick();
+        const Charger::Measure m = s.measure();
+        const uint16_t e = s.ch.errorBits();
+        if ((e & (ErrOverVoltOut | ErrOverAmpOut)) != 0U) { ++r.cutRounds; }
+        if ((e & ErrOverVoltOut) != 0U) { ++r.errV; }
+        if ((e & ErrOverAmpOut) != 0U) { ++r.errA; }
+        if ((before > 0U) && (s.ch.duty() == 0U)) { ++r.onToOff; }
+        if (m.outCv > r.maxCv) { r.maxCv = m.outCv; }
+        if ((uint16_t)(m.outCa < 0 ? -m.outCa : m.outCa) > r.maxCa) { r.maxCa = (uint16_t)(m.outCa < 0 ? -m.outCa : m.outCa); }
+    }
+    return r;
+}
+
+static void setSimple(EepromStore& st)
+{
+    st.page(4)[P5ModeBits] = (uint8_t)((st.page(4)[P5ModeBits] & ~3U) | ChargeModeSimple);
+}
+
+/* 1. Auto, MCV = absorb = 14,70 V, 1 h: inga ErrOverVoltOut, CV kring 14,60 V */
+static void testMarginAutoMcvEqAbsorb()
+{
+    EepromStore st(be());
+    setupStore(st, 1470U);
+    Sim s(st); s.recompute();
+    CHECK(s.ar.eff[AutoParams::AbsorbVolt] == 1470);      /* eff_* oforandrat (golden) */
+    s.vocBase = 1200; s.vocMax = 1450; s.capCAh = 300;
+    s.ch.command(1U);
+    uint16_t maxCvAbs = 0U; uint16_t minCvAbs = 0xFFFFU; uint32_t errV = 0U; bool reachedAbs = false;
+    for (uint32_t t = 0U; t < 3600000UL; t += 100U)
+    {
+        s.tick();
+        if ((s.ch.errorBits() & ErrOverVoltOut) != 0U) { ++errV; }
+        if ((s.ch.state() == StateCharging) && (s.ch.step() == 2U))
+        {
+            const uint16_t v = s.measure().outCv;
+            if (!reachedAbs) { s.run(10000U); reachedAbs = true; continue; }   /* insvangning */
+            if (v > maxCvAbs) { maxCvAbs = v; }
+            if (v < minCvAbs) { minCvAbs = v; }
+        }
+    }
+    CHECK(errV == 0U);
+    CHECK(reachedAbs);                                   /* bulk -> absorption vid MCV - 10 */
+    CHECK(rt16(s, RtVoltSetpoint) <= 1460U);
+    /* CV vid 14,60 V +- ett reglersteg (modellen: 5 cV per PWM-steg) */
+    CHECK(maxCvAbs >= 1455U && maxCvAbs <= 1465U);
+    CHECK(minCvAbs >= 1450U);
+    CHECK(s.ch.latchedErrorBits() == 0U);
+}
+
+/* 2. Enkel, MCV 14,40 V, batteri som nar 14,40 V: inga harda brytningar, CV under 14,40 */
+static void testMarginSimpleNoCut()
+{
+    EepromStore st(be());
+    setupStore(st, 1440U);
+    setSimple(st);
+    setU16(st, 0, EepromLayout::P1ChargeAmp, 800U);
+    Sim s(st); s.recompute();
+    s.vocBase = 1200; s.vocMax = 1436; s.capCAh = 300;
+    s.ch.command(1U);
+    RunStat r = runStat(s, 3600000UL);
+    printf("  Enkel MCV 14,40: brytvarv %u, pa->av %u, maxCv %u\n", (unsigned)r.cutRounds, (unsigned)r.onToOff, r.maxCv);
+    CHECK(r.cutRounds == 0U);
+    CHECK(r.maxCv < 1440U && r.maxCv >= 1425U);
+    CHECK(s.ch.state() == StateCharging && s.ch.latchedErrorBits() == 0U);
+    CHECK((rt16(s, RtRestrictionBits) & RestrMaxOutVolt) != 0U);   /* malet = MCV - 10 */
+}
+
+/* 3. Enkel, ChargeAmp 0: iSet = MCA - 20 cA, inga ErrOverAmpOut. Modellen far
+ *    finare steg (10 cA/PWM-steg) - marginalen hjalper bara om ett reglersteg
+ *    ar mindre an 20 cA [U]. */
+static void testMarginSimpleAmp()
+{
+    EepromStore st(be());
+    setupStore(st, 1500U);
+    setSimple(st);
+    setU16(st, 0, EepromLayout::P1ChargeAmp, 0U);
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 200U);
+    Sim s(st); s.recompute();
+    s.caPerDuty = 10;
+    s.ch.command(1U);
+    RunStat r = runStat(s, 600000UL);
+    CHECK(rt16(s, RtAmpSetpoint) == 180U);
+    CHECK(r.errA == 0U && r.cutRounds == 0U);
+    CHECK(r.maxCa <= 190U && r.maxCa >= 170U);
+    CHECK((rt16(s, RtRestrictionBits) & RestrMaxOutAmp) != 0U);
+}
+
+/* gemensamt for 4 och 5: duty 0 samma varv, >= 10 varv, och tills under granen */
+static void holdCase(bool volt)
+{
+    EepromStore st(be());
+    setupStore(st, 1500U);
+    setSimple(st);
+    setU16(st, 0, EepromLayout::P1ChargeAmp, 0U);         /* mal MCA - 20 = 480 cA */
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 500U);
+    Sim s(st); s.recompute();
+    s.caPerDuty = 10;
+    s.ch.command(1U); s.run(3000U);
+    CHECK(s.ch.duty() > 0U && s.ch.errorBits() == 0U);
+    if (volt) { s.forceCv = 1600; } else { s.forceCa = 600; }
+    s.tick();
+    CHECK(s.ch.duty() == 0U);
+    CHECK((s.ch.errorBits() & (volt ? ErrOverVoltOut : ErrOverAmpOut)) != 0U);
+    /* mellan aterstartsgransen och reglermalet (1480..1490 cV, 460..480 cA):
+     * regulatorn skulle rampa upp, men sparren haller utgangen av */
+    if (volt) { s.forceCv = 1485; } else { s.forceCa = 470; }
+    for (int i = 0; i < 25; ++i)
+    {
+        s.tick();
+        CHECK(s.ch.duty() == 0U && s.ch.errorBits() == 0U);
+        CHECK(s.ch.state() == StateCharging);
+    }
+    /* under granen men sparrtiden borjar inte om: aterstart direkt */
+    if (volt) { s.forceCv = 1470; } else { s.forceCa = 250; }
+    s.tick();
+    CHECK(s.ch.duty() > 0U);
+    /* ny brytning: exakt 10 varv av (1000 ms) aven nar allt ar normalt igen */
+    if (volt) { s.forceCv = 1600; } else { s.forceCa = 600; }
+    s.tick();
+    CHECK(s.ch.duty() == 0U);
+    s.forceCv = -1; s.forceCa = -1;
+    int off = 1;
+    while ((s.ch.duty() == 0U) && (off < 50)) { s.tick(); ++off; }
+    CHECK(off == 11);                 /* brytvarvet + 9 sparrvarv, varv 11 ramper */
+}
+
+/* 4. verklig overspanning */
+static void testHoldOverVolt() { holdCase(true); }
+/* 5. overstrom */
+static void testHoldOverAmp() { holdCase(false); }
+
+/* 6. MCV < 10 cV och MCA < 20 cA: inget underflode */
+static void testMarginTinyLimits()
+{
+    EepromStore st(be());
+    setupStore(st, 5U);
+    setSimple(st);
+    Sim s(st); s.recompute();
+    s.ch.command(1U); s.run(2000U);
+    CHECK(s.ch.duty() == 0U);
+    CHECK(rt16(s, RtVoltSetpoint) == 0U || s.ch.state() != StateCharging);
+    setU16(st, 0, EepromLayout::P1MaxChargeVolt, 1500U);
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 10U);
+    setU16(st, 0, EepromLayout::P1ChargeAmp, 0U);
+    s.recompute();
+    s.ch.command(1U); s.run(2000U);
+    CHECK(s.ch.state() == StateCharging);
+    CHECK(rt16(s, RtAmpSetpoint) == 0U && s.ch.duty() == 0U);
+    CHECK(rt16(s, RtVoltSetpoint) == 1490U);
+    setU16(st, 0, EepromLayout::P1MaxChargeVolt, 9U);
+    setU16(st, 0, EepromLayout::P1MaxChargeAmp, 300U);
+    s.recompute();
+    s.run(2000U);
+    CHECK(s.ch.duty() == 0U);
+    CHECK(rt16(s, RtVoltSetpoint) < 10U);
 }
 
 int main()
@@ -592,6 +764,12 @@ int main()
     testCountersAndDiag();
     testBurnRejectedIndicator();
     testCurrentSaturation();
+    testMarginAutoMcvEqAbsorb();
+    testMarginSimpleNoCut();
+    testMarginSimpleAmp();
+    testHoldOverVolt();
+    testHoldOverAmp();
+    testMarginTinyLimits();
     printf("test_charger: %d kontroller, %d fel\n", g_checks, g_fails);
     return (g_fails == 0) ? 0 : 1;
 }

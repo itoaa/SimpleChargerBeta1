@@ -31,12 +31,18 @@ uint16_t minU16(uint16_t a, uint16_t b)
     return (a < b) ? a : b;
 }
 
+/* a - b, men 0 om b >= a (inget underflode i uint16). */
+uint16_t subSat(uint16_t a, uint16_t b)
+{
+    return (a > b) ? (uint16_t)(a - b) : 0U;
+}
+
 } /* namespace */
 
 Charger::Charger()
     : state_(StateWaiting), step_(0U), duty_(0U), statusBits_(0U), runMode_(ChargeModeSimple),
       diagMode_(0U), startReq_(false), armed_(false), battery_(false), started_(false),
-      errorBits_(0U), stickyErr_(0U), latched_(0U), restr_(0U), vSet_(0U), iSet_(0U),
+      errorBits_(0U), stickyErr_(0U), latched_(0U), restr_(0U), vSet_(0U), iSet_(0U), holdMs_(0U),
       compDelta_(0), cAh_(0U), stageCAh0_(0U), ampAcc_(0U), whAcc_(0U), wh_(0U),
       chargeMs_(0U), totalMs_(0U), stageMs_(0U), tailMs_(0U), timerMs_(0U), lastMs_(0U)
 {
@@ -242,6 +248,8 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     uint16_t mca;
     uint16_t mcv;
     uint16_t miv;
+    uint16_t vLim;
+    uint16_t iLim;
     uint8_t cap;
     uint8_t minPwm;
     uint8_t chargeMode;
@@ -291,6 +299,35 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     errorBits_ = err;
     latched_ |= err;
     hardCut = (err != 0U);
+
+    /* BESLUT nr 38: regleringsmal under hardgransen. Hardgransen ovan ar
+     * oforandrad. MCV < 10 cV eller MCA < 20 cA ger mal 0 (utgang av). */
+    vLim = subSat(mcv, (uint16_t)VoltRegMarginCv);
+    iLim = subSat(mca, (uint16_t)AmpRegMarginCa);
+    /* Sparrtid och hysteres efter hard brytning: minst HardCutHoldMs, sedan
+     * tills V < MCV - 20 cV och I < MCA - 40 cA. holdMs_ = 1 betyder att
+     * tiden ar ute men villkoret inte uppfyllt. Nollas inte av stopp. */
+    if (hardCut)
+    {
+        holdMs_ = (uint16_t)HardCutHoldMs;
+    }
+    else if (holdMs_ > 0U)
+    {
+        if ((uint32_t)holdMs_ > dt)
+        {
+            holdMs_ = (uint16_t)(holdMs_ - (uint16_t)dt);
+        }
+        else if ((m.outCv < subSat(mcv, (uint16_t)VoltRearmCv)) &&
+                 (a < subSat(mca, (uint16_t)AmpRearmCa)))
+        {
+            holdMs_ = 0U;
+        }
+        else
+        {
+            holdMs_ = 1U;
+        }
+    }
+    else {}
 
     /* Utgang av-villkor (MaxChargeVolt 0 = utgang av, BESLUT nr 24) */
     ready = (mcv > 0U) && (cap > 0U) && (minPwm <= cap) &&
@@ -363,6 +400,10 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     absCv = clampU16(AutoParams::compTarget(e[AutoParams::AbsorbVolt], ar, 0, false));
     floatCv = clampU16(AutoParams::compTarget(e[AutoParams::FloatVolt], ar, 0, false));
     compDelta_ = 0;   /* ingen batteritempgivare (etapp 6): ingen kompensering */
+    /* nr 38: steggranser och mal foljer det reglerade malet (absorb > MCV - 10
+     * cV ger bulk -> absorption vid MCV - 10 cV, annars nas granen aldrig). */
+    absCv = minU16(absCv, vLim);
+    floatCv = minU16(floatCv, vLim);
     if (state_ == StateCharging)
     {
         chargeMs_ += dt;
@@ -405,19 +446,24 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     /* --- regulator: ett steg per varv, som tidigare --- */
     restr_ = 0U;
     statusBits_ = 0U;
-    if ((state_ != StateCharging) || hardCut)
+    if (state_ == StateCharging)
+    {
+        /* nr 38: mal hogst MCV - 10 cV / MCA - 20 cA, aven under sparrtid
+         * (realtidens borvarden visar det reglerade malet). */
+        iSet_ = minU16(iSet_, iLim);
+        vSet_ = minU16(vSet_, vLim);
+    }
+    if ((state_ != StateCharging) || hardCut || (holdMs_ > 0U))
     {
         duty_ = 0U;
     }
     else
     {
-        iSet_ = minU16(iSet_, mca);
-        vSet_ = minU16(vSet_, mcv);
         atLimit = (a >= iSet_) || (m.outCv >= vSet_);
         if (a >= iSet_) { statusBits_ |= StatusCC; }
         if (m.outCv >= vSet_) { statusBits_ |= StatusCV; }
-        if (iSet_ == mca) { restr_ |= RestrMaxOutAmp; }
-        if (vSet_ == mcv) { restr_ |= RestrMaxOutVolt; }
+        if (iSet_ == iLim) { restr_ |= RestrMaxOutAmp; }
+        if (vSet_ == vLim) { restr_ |= RestrMaxOutVolt; }
         if (atLimit)
         {
             if (duty_ > 0U) { duty_--; }
