@@ -20,7 +20,7 @@ enum Col {
 };
 
 const uint8_t TypeCount = 6U;   /* index 6 Anpassad, 7 INVALID */
-const uint8_t NomvCount = 5U;
+const uint8_t NomvCount = 4U;   /* 6/12/24/36 V; index 4..7 ogiltiga (BESLUT nr 45) */
 
 /* Typtabell i flash. tc lagras som tvakomplement (uint16) och tolkas S16. */
 const uint16_t kTypes[TypeCount][ColCount] SC_PROGMEM = {
@@ -34,8 +34,8 @@ const uint16_t kTypes[TypeCount][ColCount] SC_PROGMEM = {
 };
 
 const uint8_t kCells[2][NomvCount] SC_PROGMEM = {
-    { 3U, 6U, 12U, 18U, 24U },   /* bly */
-    { 2U, 4U, 8U, 12U, 16U },    /* LiFePO4 */
+    { 3U, 6U, 12U, 18U },   /* bly */
+    { 2U, 4U, 8U, 12U },    /* LiFePO4 */
 };
 
 const uint16_t kSensorMaxCa[4] SC_PROGMEM = { 500U, 2000U, 3000U, 0U };

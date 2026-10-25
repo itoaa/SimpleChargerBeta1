@@ -47,6 +47,7 @@ Källor: `SPEC_tabeller_v2.2.md`, `SPEC_v2.2.md` och `SmedbyCharger_v2.2.ini`. D
   - `diagMode` lagras alltid som Normal.
   - Efter skrivningen läses allt tillbaka och CRC kontrolleras.
 - Kopieringsknapparna (E\x07–E\x09) bränner inte. `MaxChargeVolt` 0 betyder att utgången är av.
+- Hårdvarutak (BESLUT nr 45, `shared/hwLimits.hpp`): efter `load()` och efter varje godkänd W/X begränsas `MaxChargeVolt` och man_*-spänningsfälten (sida 5) till 55,00 V i RAM. U16-fält klampas bara om skrivningen täckte hela fältet. Inget skrivs till EEPROM förrän B. `batteryNomVolt` 4–7 är ogiltiga (48 V stöds inte). Layout, offset, CRC och standardvärden är oförändrade.
 
 ### Burn-villkor (BESLUT.md nr 7)
 

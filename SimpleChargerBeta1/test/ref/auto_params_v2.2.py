@@ -5,6 +5,9 @@ v2.2 (Olas beslut 2026-10-24): tempkomp -4,0 mV/°C/cell for ALLA blytyper, ref 
 sida 1 i 0,01 A / 0,01 V (max_charge_amp/max_charge_volt anges nu i cA/cV), bulkMaxTime raknas
 om fran MANUELL bulkstrom, float raknas in i totalMaxTime, 15 A hardvarutak galler aven manuella
 strommar, kalcium/EFB 14,7 V, LiFePO4 = OBEKRAFTAT forslag (Victron).
+v2.2 andring (Olas beslut 2026-10-25 14:11, BESLUT nr 45 i SimpleChargerBeta1): 48 V stods inte.
+Nominell spanning index 4 (48 V: 24 celler bly, 16S LiFePO4) ar borttagen och ger NOMV_INVALID
+som index 5..7. Hardvarutak 55 V ut / 65 V in.
 
 Indata : batterityp, kapacitet (Ah), nominell spanning, tak/golv, hardvarugranser, overrides.
 Utdata : effektiva laddparametrar (samma enheter/upplosning som i ini-filen: 0,01 A / 0,01 V / min / s).
@@ -51,8 +54,8 @@ T_CUSTOM = 6
 COLS = ('key','name','crate','absV','tail','floatV','floatA','absMax','floatMax','tc','restV','prechV','prechA','vMax','presV','tMin','tMax','chem')
 def trow(i): return dict(zip(COLS, TYPES[i]))
 
-NOMV = [6, 12, 24, 36, 48]                          # batteryNomVolt-alternativ (index 0..4)
-CELLS = {'lead': [3, 6, 12, 18, 24], 'lfp': [2, 4, 8, 12, 16]}
+NOMV = [6, 12, 24, 36]                              # batteryNomVolt-alternativ (index 0..3); 48 V borttagen (nr 45)
+CELLS = {'lead': [3, 6, 12, 18], 'lfp': [2, 4, 8, 12]}
 SENSOR_MAX_CA = [500, 2000, 3000, 0]               # ACS712-05B / -20A / -30A / shunt(0 = ingen grans)
 HW_AMP_MAX_CA = 1500                               # 15 A hardvarutak (Ola) - galler auto OCH manuellt
 TOTAL_TIME_MAX = 10080                             # 7 dygn, ovre grans for totalMaxTime
@@ -266,6 +269,10 @@ def selftest():
     e, _, _ = effective(1, 400)
     assert comp_target(1440, e, 0) == 1500 and comp_target(1440, e, 350) == 1416
     assert len(PARAMS) <= 24
+    # 48 V stods inte (nr 45): index 4 ger NOMV_INVALID som index 5..7, alla tak <= 55 V
+    e, w, m = effective(1, 400, nomv_idx=4, man={n: 0 for n in PNAMES})
+    assert w & W['NOMV_INVALID'] and m == (1 << len(PARAMS)) - 1
+    assert all(_vpc(trow(i)['vMax'], CELLS[trow(i)['chem']][-1]) <= 5500 for i in range(len(TYPES)))
     # v2.2-beslut
     assert all(trow(i)['tc'] == -40 for i in range(5)), 'tempkomp -4 for alla blytyper'
     assert trow(4)['absV'] * 6 // 100 == 1470, 'kalcium/EFB 14,7 V'
@@ -281,7 +288,7 @@ def selftest():
     assert e['bulkAmp'] == 550
     e, w, _ = effective(1, 400, ovr_mask=1 << PIDX['floatMaxTime'], man={'floatMaxTime': 0})
     assert w & W['FLOAT_UNLIMITED'] and e['totalMaxTime'] == 120 + 360 + 240
-    print('selftest OK (18 kontroller)')
+    print('selftest OK (20 kontroller)')
 
 if __name__ == '__main__':
     if len(sys.argv) >= 3:

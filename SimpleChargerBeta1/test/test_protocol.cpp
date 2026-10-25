@@ -31,7 +31,8 @@ static unsigned g_cmdCount = 0U;
 static int g_written[6];
 static void hookBurn(void*) { ++g_burns; }
 static void hookCmd(uint8_t c, void*) { if (g_cmdCount < sizeof(g_cmds)) { g_cmds[g_cmdCount] = c; } ++g_cmdCount; }
-static void hookWritten(uint8_t p, void*) { if (p < 6U) { ++g_written[p]; } }
+static uint8_t g_wOff = 0xFFU, g_wLen = 0U;
+static void hookWritten(uint8_t p, uint8_t off, uint8_t len, void*) { if (p < 6U) { ++g_written[p]; } g_wOff = off; g_wLen = len; }
 
 static uint32_t g_now = 1000U;
 static void feed(TunerStudio& ts, const uint8_t* b, unsigned n)
@@ -101,6 +102,7 @@ int main()
     { const uint8_t w[3] = { 'W', 10U, 7U }; feed(ts, w, 3U); }
     CHECK(store.page(0)[10] == 7U);
     CHECK(g_written[0] == 1);
+    CHECK(g_wOff == 10U && g_wLen == 1U);   /* nr 45: kroken far offset och langd */
     /* W utanfor sidan: inget andras, ingen krok */
     {
         uint8_t before[38]; memcpy(before, store.page(0), 38U);
@@ -118,6 +120,7 @@ int main()
         feed(ts, x, sizeof(x));
         CHECK(memcmp(store.page(3) + 4, x + 3, 64U) == 0);
         CHECK(g_written[3] == 1);
+        CHECK(g_wOff == 4U && g_wLen == 64U);
     }
     /* X med count 65 avvisas helt men datat las bort; nasta kommando fungerar */
     {

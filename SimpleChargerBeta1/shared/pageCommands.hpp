@@ -43,6 +43,18 @@ void autoInputBoot(const uint8_t* page1, uint8_t bootSensor, AutoParams::Input& 
  * pageRefreshReq-bitar (0 om inget andrades eller koden inte ar 7..9). */
 uint8_t apply(uint8_t code, uint8_t* page5, uint8_t* page2, const AutoParams::Input& in);
 
+/* BESLUT nr 45: hardvarutak i en RAM-sida efter skrivning (W/X) eller
+ * laddning. pageIdx 0-baserat. Ett U16-falt klampas bara om omradet
+ * [off, off+len) tacker hela faltet, sa att en halv skrivning (W skriver
+ * en byte) inte ger ett blandat varde. Sida 1: MaxChargeVolt <= HwVoltMaxCv.
+ * Sida 5: man_absorbVolt/floatVolt/restartVolt/prechargeVolt/voltLimit/
+ * batteryPresentVolt <= HwVoltMaxCv. Returnerar true om nagot andrades.
+ * Bara RAM-kopian andras (ingen burn). */
+bool clampHwLimits(uint8_t pageIdx, uint8_t* page, uint16_t off, uint16_t len);
+
+/* MaxChargeVolt fran sida 1, begransad till HwVoltMaxCv (0 = av behalls). */
+uint16_t maxChargeVoltCv(const uint8_t* page1);
+
 /* E8:s mappning (exponerad for test): skriver bara page2 byte 4..83. */
 void copyEffectiveToSteps(const AutoParams::Result& r, uint8_t* page2);
 

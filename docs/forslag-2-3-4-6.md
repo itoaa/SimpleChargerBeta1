@@ -35,9 +35,9 @@ Varje steg är 20 B. Steg n börjar på offset 4 + 20·(n−1), alltså s1 = 4, 
 | 0 | method [0:1] (0 CC, 1 CV, 2 Monitor, 3 Av), onEnd [2:3] (0 Nästa, 1 Gå till steg 1, 2 Stopp klar, 3 Stopp med fel) | bits |
 | 1 | tempMax | S08 °C, −40..80 |
 | 2 | current | U16 cA, 0..3000 |
-| 4 | volt | U16 cV, 0..6000 |
-| 6 | endVoltMax (U ≥, 0 = av) | U16 cV |
-| 8 | endVoltMin (U ≤, 0 = av; Monitor → omstart) | U16 cV |
+| 4 | volt | U16 cV, 0..5500 (BESLUT nr 45, `HwVoltMaxCv`; tidigare 0..6000) |
+| 6 | endVoltMax (U ≥, 0 = av) | U16 cV, 0..5500 |
+| 8 | endVoltMin (U ≤, 0 = av; Monitor → omstart) | U16 cV, 0..5500 |
 | 10 | endAmpMax (I ≥) | U16 cA |
 | 12 | endAmpMin (I ≤) | U16 cA |
 | 14 | maxTime (0 = obegränsad) | U16 min, 0..6000 |

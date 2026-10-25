@@ -165,9 +165,9 @@ static bool stepIs(const uint8_t* p, const StepExp& e)
     ok = ok && ((p[0] & 3U) == e.method) && (((p[0] >> 2) & 3U) == e.onEnd) && ((p[0] & 0xF0U) == 0U);
     ok = ok && ((int8_t)p[1] == clampI(e.tempMax, -40, 80));
     ok = ok && (rd16(p + 2) == clampI(e.current, 0, 1500));
-    ok = ok && (rd16(p + 4) == clampI(e.volt, 0, 6000));
-    ok = ok && (rd16(p + 6) == clampI(e.endVoltMax, 0, 6000));
-    ok = ok && (rd16(p + 8) == clampI(e.endVoltMin, 0, 6000));
+    ok = ok && (rd16(p + 4) == clampI(e.volt, 0, 5500));        /* BESLUT nr 45 */
+    ok = ok && (rd16(p + 6) == clampI(e.endVoltMax, 0, 5500));
+    ok = ok && (rd16(p + 8) == clampI(e.endVoltMin, 0, 5500));
     ok = ok && (rd16(p + 10) == clampI(e.endAmpMax, 0, 1500));
     ok = ok && (rd16(p + 12) == clampI(e.endAmpMin, 0, 1500));
     ok = ok && (rd16(p + 14) == clampI(e.maxTime, 0, 6000));
@@ -303,10 +303,10 @@ static void testE8Clamp()
     const uint8_t* s3 = s2 + P2StepSize;
     const uint8_t* s4 = s3 + P2StepSize;
     CHECK(s1[19] == 200U);
-    CHECK(rd16(s1 + 2) == 1500U && rd16(s1 + 4) == 6000U && rd16(s1 + 6) == 6000U && rd16(s1 + 14) == 6000U);
+    CHECK(rd16(s1 + 2) == 1500U && rd16(s1 + 4) == 5500U && rd16(s1 + 6) == 5500U && rd16(s1 + 14) == 6000U);
     CHECK(rd16(s2 + 12) == 1500U && rd16(s2 + 16) == 65535U);
     CHECK(rd16(s3 + 2) == 0U && rd16(s3 + 4) == 0U);
-    CHECK(rd16(s4 + 8) == 6000U);
+    CHECK(rd16(s4 + 8) == 5500U);
     CHECK((int8_t)s1[1] == 80 && (int8_t)s1[18] == 60);
     CHECK(p2[0] == 0x04U && p2[1] == 0xA5U && p2[2] == 0xA5U && p2[3] == 0xA5U);   /* byte 0..3 orord */
     r.eff[AutoParams::ChargeTempMax] = -60;
@@ -320,6 +320,75 @@ static void testE8Clamp()
     PageCommands::copyEffectiveToSteps(r, p2);
     CHECK(rd16(s1 + 2) == 1500U && rd16(s2 + 2) == 1500U);
     CHECK(rd16(s2 + 12) == 1500U && rd16(s3 + 2) == 1499U);
+    /* BESLUT nr 45: spanning 0..5500 cV (55,00 V), gransvarden */
+    r.eff[AutoParams::AbsorbVolt] = 5501;
+    r.eff[AutoParams::FloatVolt] = 5500;
+    r.eff[AutoParams::RestartVolt] = 5499;
+    PageCommands::copyEffectiveToSteps(r, p2);
+    CHECK(rd16(s1 + 4) == 5500U && rd16(s1 + 6) == 5500U);
+    CHECK(rd16(s4 + 8) == 5499U);
+}
+
+/* 4b: hardvarutak i sidorna efter skrivning (BESLUT nr 45) */
+static void testHwClamp()
+{
+    EepromStore s(be());
+    s.loadDefaults();
+    uint8_t* p1 = s.page(PageIdx1);
+    uint8_t* p5 = s.page(PageIdx5);
+    const uint16_t mcvOff = EepromLayout::P1MaxChargeVolt;
+    /* hel skrivning over taket -> 5500 */
+    setU16(p1 + mcvOff, 6000U);
+    CHECK(PageCommands::clampHwLimits(PageIdx1, p1, mcvOff, 2U));
+    CHECK(rd16(p1 + mcvOff) == 5500U);
+    /* gransvarden */
+    setU16(p1 + mcvOff, 5500U);
+    CHECK(!PageCommands::clampHwLimits(PageIdx1, p1, 0U, EepromLayout::Page1Size) && rd16(p1 + mcvOff) == 5500U);
+    setU16(p1 + mcvOff, 5501U);
+    CHECK(PageCommands::clampHwLimits(PageIdx1, p1, 0U, EepromLayout::Page1Size) && rd16(p1 + mcvOff) == 5500U);
+    setU16(p1 + mcvOff, 5499U);
+    CHECK(!PageCommands::clampHwLimits(PageIdx1, p1, mcvOff, 2U) && rd16(p1 + mcvOff) == 5499U);
+    /* halv skrivning (en byte, som W) klampas inte */
+    setU16(p1 + mcvOff, 0xFFFFU);
+    CHECK(!PageCommands::clampHwLimits(PageIdx1, p1, mcvOff, 1U) && rd16(p1 + mcvOff) == 0xFFFFU);
+    CHECK(!PageCommands::clampHwLimits(PageIdx1, p1, (uint16_t)(mcvOff + 1U), 1U) && rd16(p1 + mcvOff) == 0xFFFFU);
+    /* lasning begransas anda (0 = av behalls) */
+    CHECK(PageCommands::maxChargeVoltCv(p1) == 5500U);
+    setU16(p1 + mcvOff, 0U);
+    CHECK(PageCommands::maxChargeVoltCv(p1) == 0U);
+    setU16(p1 + mcvOff, 5501U);
+    CHECK(PageCommands::maxChargeVoltCv(p1) == 5500U);
+    setU16(p1 + mcvOff, 1470U);
+    CHECK(PageCommands::maxChargeVoltCv(p1) == 1470U);
+    {
+        AutoParams::Input in;
+        setU16(p1 + mcvOff, 6000U);
+        PageCommands::autoInputBoot(p1, 0U, in);
+        CHECK(in.maxChargeVolt == 5500U);
+        PageCommands::autoInput(p1, s.page(PageIdx3), in);
+        CHECK(in.maxChargeVolt == 5500U);
+    }
+    /* sida 5: man_* spanningsfalt, ovriga U16 orora */
+    static const uint8_t ids[6] = { AutoParams::AbsorbVolt, AutoParams::FloatVolt, AutoParams::RestartVolt,
+                                    AutoParams::PrechargeVolt, AutoParams::VoltLimit, AutoParams::BatteryPresentVolt };
+    for (uint8_t i = 0U; i < 6U; ++i) { setU16(p5 + AutoParams::manOffset(ids[i]), (uint16_t)(5501U + i)); }
+    setU16(p5 + AutoParams::manOffset(AutoParams::BulkAmp), 9000U);
+    uint8_t copy5[EepromLayout::Page5Size];
+    memcpy(copy5, p5, sizeof(copy5));
+    CHECK(PageCommands::clampHwLimits(PageIdx5, p5, 0U, EepromLayout::Page5Size));
+    bool ok = true;
+    for (uint8_t i = 0U; i < 6U; ++i) { ok = ok && (rd16(p5 + AutoParams::manOffset(ids[i])) == 5500U); }
+    CHECK(ok);
+    CHECK(rd16(p5 + AutoParams::manOffset(AutoParams::BulkAmp)) == 9000U);
+    for (uint8_t i = 0U; i < 6U; ++i) { setU16(copy5 + AutoParams::manOffset(ids[i]), 5500U); }
+    CHECK(memcmp(copy5, p5, sizeof(copy5)) == 0);
+    /* ovriga sidor: ingen andring */
+    uint8_t* p2 = s.page(PageIdx2);
+    uint8_t copy2[EepromLayout::Page2Size];
+    memset(p2, 0xFF, EepromLayout::Page2Size);
+    memcpy(copy2, p2, sizeof(copy2));
+    CHECK(!PageCommands::clampHwLimits(PageIdx2, p2, 0U, EepromLayout::Page2Size));
+    CHECK(memcmp(copy2, p2, sizeof(copy2)) == 0);
 }
 
 /* 5: AH_MISSING / NOMV_INVALID -> ingen andring, 0 */
@@ -378,14 +447,14 @@ static void testE8Matrix()
 {
     static const uint16_t caps[] = { 1U, 50U, 1000U, 20000U, 65535U };
     static const uint16_t mcas[] = { 0U, 300U, 1500U, 3000U };
-    static const uint16_t mcvs[] = { 0U, 1500U, 6000U };
+    static const uint16_t mcvs[] = { 0U, 1500U, 5500U, 6000U };
     long runs = 0, bad = 0, blocked = 0;
     EepromStore s(be());
     for (uint8_t type = 0U; type < 8U; ++type)
     for (uint8_t nomv = 0U; nomv < 8U; ++nomv)
     for (uint8_t ci = 0U; ci < 5U; ++ci)
     for (uint8_t mi = 0U; mi < 4U; ++mi)
-    for (uint8_t vi = 0U; vi < 3U; ++vi)
+    for (uint8_t vi = 0U; vi < 4U; ++vi)
     for (uint8_t sens = 0U; sens < 4U; ++sens)
     for (uint8_t ovr = 0U; ovr < 2U; ++ovr)
     {
@@ -417,8 +486,8 @@ static void testE8Matrix()
             const uint8_t* p = stepP(s, n);
             ok = ok && ((p[0] & 0xF0U) == 0U) && (((p[0] >> 2) & 3U) <= 2U);
             ok = ok && ((int8_t)p[1] >= -40) && ((int8_t)p[1] <= 80);
-            ok = ok && (rd16(p + 2) <= 1500U) && (rd16(p + 4) <= 6000U) && (rd16(p + 6) <= 6000U);
-            ok = ok && (rd16(p + 8) <= 6000U) && (rd16(p + 10) <= 1500U) && (rd16(p + 12) <= 1500U);
+            ok = ok && (rd16(p + 2) <= 1500U) && (rd16(p + 4) <= 5500U) && (rd16(p + 6) <= 5500U);
+            ok = ok && (rd16(p + 8) <= 5500U) && (rd16(p + 10) <= 1500U) && (rd16(p + 12) <= 1500U);
             ok = ok && (rd16(p + 14) <= 6000U);
             ok = ok && ((int8_t)p[18] >= -40) && ((int8_t)p[18] <= 60) && (p[19] <= 200U);
         }
@@ -440,6 +509,7 @@ int main()
     testE8ManualOverride();
     testE8Restart();
     testE8Clamp();
+    testHwClamp();
     testE8Blocked();
     testRefreshHold();
     testE8Matrix();

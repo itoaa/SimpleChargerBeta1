@@ -174,8 +174,10 @@ static void onCommand(uint8_t code, void*)
 	}
 }
 
-static void onPageWritten(uint8_t, void*)
+static void onPageWritten(uint8_t page, uint8_t offset, uint8_t len, void*)
 {
+	/* BESLUT nr 45: hardvarutak i RAM-sidan (bara falt som skrivningen tackte helt) */
+	(void)PageCommands::clampHwLimits(page, gStore.page(page), offset, len);
 	computeAuto();
 }
 
@@ -212,6 +214,9 @@ int main()
 	guard.ctx = 0;
 	gStore.setBurnGuard(guard);
 	(void)gStore.load();          /* ogiltig sida -> standard + eepromWarnBits */
+	/* BESLUT nr 45: aldre EEPROM-varden over hardvarutaken begransas i RAM (ingen burn) */
+	(void)PageCommands::clampHwLimits(TsLayout::PageIdx1, gStore.page(TsLayout::PageIdx1), 0U, EepromLayout::Page1Size);
+	(void)PageCommands::clampHwLimits(TsLayout::PageIdx5, gStore.page(TsLayout::PageIdx5), 0U, EepromLayout::Page5Size);
 	gBootSensorSel = PageCommands::sensorSel(gStore.page(TsLayout::PageIdx3));
 	computeAuto();
 

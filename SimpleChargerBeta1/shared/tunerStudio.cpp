@@ -49,7 +49,7 @@ void TunerStudio::applyWrite(const uint8_t* src, uint8_t len)
     {
         if (hooks_.pageWritten != 0)
         {
-            hooks_.pageWritten(page_, hooks_.ctx);
+            hooks_.pageWritten(page_, offset_, len, hooks_.ctx);
         }
     }
 }

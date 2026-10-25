@@ -36,7 +36,9 @@ public:
     {
         void (*burn)(void* ctx);                     /* B */
         void (*command)(uint8_t code, void* ctx);    /* E<code> */
-        void (*pageWritten)(uint8_t page, void* ctx);/* efter godkand W/X */
+        /* efter godkand W/X: sida, forsta offset och antal byte (BESLUT nr 45:
+         * main klampar hardvarutak bara i falt som skrivningen tackte helt) */
+        void (*pageWritten)(uint8_t page, uint8_t offset, uint8_t len, void* ctx);
         void* ctx;
     };
 

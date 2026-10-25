@@ -471,3 +471,41 @@ Olas beslut 2026-10-25 (punkt 1, 3, 5, 6, 7, via Max). Originalets presentation 
 - Alla dialognamn, villkor, kommandoknappar, kurvor, mätarnamn och loggkanaler är oförändrade. Generatorn kontrollerar detta med assert.
 
 **Inte verifierat i TunerStudio:** grad-tecknet i ISO-8859-1, `<br>`, topicHelp mot help-namn, indicatorTemplate i högerklicksmenyn, std_realtime i Tools-menyn och tillägg till Help-menyn. Se docs/hil-testprotokoll.md.
+
+## 45. 48 V stöds inte; tak 55 V ut och 65 V in (2026-10-25)
+Olas beslut 2026-10-25 14:11 (via Max, uttryckligen godkänt med konsekvenserna): 48 V-stöd stryks. Taken 55 V utspänning och 65 V inspänning gäller. 48 V-batterier (24 celler bly, 16S LiFePO4) tas bort ur autoläget.
+
+**Skäl:** utspänningsmätningen slutar vid 55 V, och det finns inget schema eller BOM som visar att hårdvaran klarar mer.
+
+**En enda konstant:** `shared/hwLimits.hpp`, `HwLimits::HwVoltMaxCv = 5500` (55,00 V). Den används av:
+- E8-klampningen (`VoltMaxCv` i pageCommands.cpp sänkt från 6000 till 5500) för s1–s4 volt/endVoltMax/endVoltMin.
+- `PageCommands::clampHwLimits()`: efter varje godkänd W/X (main.cpp `onPageWritten`) och efter `load()` vid uppstart begränsas `MaxChargeVolt` (sida 1) och `man_absorbVolt`, `man_floatVolt`, `man_restartVolt`, `man_prechargeVolt`, `man_voltLimit`, `man_batteryPresentVolt` (sida 5) till 5500 i RAM. Ett U16-fält klampas bara om skrivningen täckte hela fältet. W skriver en byte åt gången (spec 3.3.7), och en halv skrivning ska inte ge ett blandat värde. Inget bränns automatiskt.
+- Läsning: `PageCommands::maxChargeVoltCv()` begränsar `MaxChargeVolt` till 5500 där firmware läser det (Charger, `autoInput`, `autoInputBoot`). 0 betyder fortfarande att utgången är av.
+- ini-max: `tools/ini22_ui.py` läser `hwLimits.hpp` och sätter `hi` för s1–s4- och man_*-spänningsfälten. Den kontrollerar också att `MaxChargeVolt` har samma värde (assert). `test/check_ini_layout.py` fäller om ini och hwLimits.hpp skiljer sig.
+- Klampningen sker inte inne i `AutoParams::compute` (det skulle ändra golden för fall som inte gäller 48 V).
+
+**Autoläget:** `NomvCount` 5 → 4, `kCells` = bly {3, 6, 12, 18} och LiFePO4 {2, 4, 8, 12}. `batteryNomVolt` index 4 (tidigare 48 V) ger nu `NOMV_INVALID` som index 5–7: alla man_*-värden används och E8 blockeras. Borttagna konfigurationer (värden från Drive-originalet, 100 Ah):
+
+| Typ | Celler | Absorption | Float | Restart | voltLimit |
+|---|---|---|---|---|---|
+| 0 Bly SLI, 3 Bly djupcykel, 4 Bly kalcium/EFB | 24 | 58,80 V | 54,00 V | 50,00 V | 60,00 V |
+| 1 Bly AGM | 24 | 57,60 V | 54,40 V | 50,00 V | 60,00 V |
+| 2 Bly GEL | 24 | 57,00 V | 54,80 V | 50,00 V | 60,00 V |
+| 5 LiFePO4 | 16 | 56,80 V | 54,00 V | 52,80 V | 58,40 V |
+
+Kvar: 6/12/24/36 V. Högsta voltLimit är 45,00 V (bly 18 celler) [kontrolleras i selftest: alla ≤ 55,00 V].
+
+**Python-förlagan och golden:** `test/ref/auto_params_v2.2.py` (repots kopia, md5 36477a1af53ac70082480ed36e2e9eb2) har NOMV/CELLS utan 48 V och två nya selftest-kontroller. Drive-originalet (md5 ef56d1755987754a3a591b8dd32f4c74) är inte ändrat. Ola behöver ladda upp repots kopia till Drive. Golden genereras från repots kopia (`test/gen_auto_golden.py`, ny REF_MD5). Fallen och slumpsekvensen är oförändrade, och antalet kontroller är fortfarande 44 137. Diff mellan gammal och ny golden:
+- 844 rader i kGoldenAuto ändrade, alla med nomv = 4 och identisk indata.
+- 876 rader i kGoldenComp ändrade, alla för fall med nomv = 4. Spänningen v härleds ur fallets effektiva värden.
+- kGoldenMan och kGoldenCompSyn är oförändrade. Inga rader för andra fall är ändrade.
+
+**ini:** `batteryNomVolt` alternativ 4 = "INVALID", `pa_typeOk` kräver `batteryNomVolt < 4` och 48 V-grenarna i `pa_cellCount` är borttagna. check_ini_layout jämför alternativen, `pa_typeOk` och `pa_cellCount` mot `NomvCount` och `kCells` i autoParams.cpp.
+
+**Inte ändrat:** EEPROM-layout, format, offset och standardvärden (standard är 12 V). En lagrad 4:a i batteryNomVolt tolkas som ogiltig.
+
+**Ersätter:** den öppna frågan i nr 42 och "Inte ändrat"-punkten om E8 och 60 V i nr 43. Dessa står kvar som historik.
+
+**[U]:**
+- Att RAM-klampningen efter W/X gör att TS och firmware har olika värde tills sidan läses om. ini-max hindrar normalt inmatning över 55 V.
+- Om TS skriver U16 byte för byte med W. Då klampas inte fältet vid skrivning, men läsningen av MaxChargeVolt är begränsad och klampningen vid uppstart gäller.

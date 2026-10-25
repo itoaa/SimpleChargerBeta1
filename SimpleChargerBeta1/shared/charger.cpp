@@ -4,6 +4,7 @@
 #include "charger.hpp"
 #include "eepromLayout.hpp"
 #include "tsLayout.hpp"
+#include "pageCommands.hpp"
 
 using namespace TsLayout;
 
@@ -273,7 +274,7 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     {
         mca = (uint16_t)AbsMaxChargeAmp;
     }
-    mcv = scGetU16le(p1 + EepromLayout::P1MaxChargeVolt);
+    mcv = PageCommands::maxChargeVoltCv(p1);   /* BESLUT nr 45: <= 55,00 V */
     miv = scGetU16le(p1 + EepromLayout::P1MaxInputVolt);
     cap = p1[EepromLayout::P1MaxPWM];
     if (cap > (uint8_t)DutyHardMax)

@@ -91,6 +91,39 @@ for prefix, chan in (('Err', 'errorBits'), ('Restr', 'restrictionBits')):
     expect('%s-bitar (indikatorer)' % chan, fw, ini)
     expect('%s-bitar unika' % chan, len(set(fw)), len(fw))
 
+# BESLUT nr 45: hardvarutak i shared/hwLimits.hpp mot ini-max (en enda kalla).
+hw = dict((m.group(1), int(m.group(2))) for m in re.finditer(
+    r'const\s+uint(?:8|16)_t\s+(Hw\w+)\s*=\s*(\d+)U', open(os.path.join(ROOT, 'shared', 'hwLimits.hpp')).read()))
+cby = dict((d['name'], d) for d in cons)
+def ini_hi(name, scale):
+    if name not in cby:
+        errors.append('%s saknas i ini' % name)
+        return None
+    return int(round(float(cby[name]['hi']) * scale))
+volt_fields = (['MaxChargeVolt'] +
+               ['s%d_%s' % (n, x) for n in range(1, 5) for x in ('volt', 'endVoltMax', 'endVoltMin')] +
+               ['man_' + x for x in ('absorbVolt', 'floatVolt', 'restartVolt', 'prechargeVolt',
+                                     'voltLimit', 'batteryPresentVolt')])
+for n in volt_fields:
+    expect('%s hi (HwVoltMaxCv)' % n, hw.get('HwVoltMaxCv'), ini_hi(n, 100))
+
+# BESLUT nr 45: autolagets nominella spanningar (autoParams.cpp NomvCount/kCells) mot ini
+apsrc = open(os.path.join(ROOT, 'shared', 'autoParams.cpp')).read()
+nomv_n = int(re.search(r'const\s+uint8_t\s+NomvCount\s*=\s*(\d+)U', apsrc).group(1))
+kc = re.search(r'kCells\[2\]\[NomvCount\][^{]*\{\s*\{([^}]*)\}[^{]*\{([^}]*)\}', apsrc)
+lead = [int(x) for x in re.findall(r'\d+', kc.group(1))]
+lfp = [int(x) for x in re.findall(r'\d+', kc.group(2))]
+opts = [o.strip('"') for o in cby['batteryNomVolt']['options']]
+expect('batteryNomVolt giltiga alternativ', ['%d V' % (2 * c) for c in lead],
+       [o for o in opts if o != 'INVALID'])
+expect('batteryNomVolt INVALID fran index NomvCount', ['INVALID'] * (8 - nomv_n), opts[nomv_n:])
+m = re.search(r'pa_typeOk\s*=\s*\{.*batteryNomVolt < (\d+)', initext)
+expect('pa_typeOk batteryNomVolt < NomvCount', nomv_n, int(m.group(1)) if m else None)
+m = re.search(r'^\s*pa_cellCount\s*=(.*)$', initext, re.M)
+pairs = re.findall(r'batteryNomVolt == (\d+) \? (\d+)', m.group(1) if m else '')
+expect('pa_cellCount LiFePO4 + bly (kCells)', list(enumerate(lfp)) + list(enumerate(lead)),
+       [(int(i), int(c)) for i, c in pairs])
+
 for e in errors:
     print('FEL:', e)
 print('check_ini_layout: %d kontroller, %d fel (%s)' % (checked, len(errors), os.path.basename(INI)))

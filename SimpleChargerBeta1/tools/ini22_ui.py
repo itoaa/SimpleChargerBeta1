@@ -6,7 +6,19 @@
 # standardvarden (utom oversatta alternativtexter) ar oforandrade; det kontrolleras
 # med assert nedan och med test/check_ini_layout.py + ref/validate_ini_v2.2.py.
 # Filen skrivs latin-1: enda icke-ASCII-tecknet ar grad-tecknet (0xB0).
+import os
 import re
+
+# Hardvarutak fran firmware (shared/hwLimits.hpp), BESLUT nr 45: en enda kalla.
+HW_HPP = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'shared', 'hwLimits.hpp')
+def hw_limits(path=HW_HPP):
+    txt = open(path).read()
+    return dict((m.group(1), int(m.group(2))) for m in re.finditer(
+        r'const\s+uint(?:8|16)_t\s+(Hw\w+)\s*=\s*(\d+)U', txt))
+HW = hw_limits()
+def num(x):
+    return ('%.2f' % x).rstrip('0').rstrip('.')
+HW_VOLT = num(HW['HwVoltMaxCv'] / 100.0)          # '55'
 
 D = '\xb0'          # grad-tecknet (latin-1 0xB0)
 DC = D + 'C'
@@ -80,7 +92,9 @@ HI_VOLT = ([s + x for s in STEP for x in ('_volt', '_endVoltMax', '_endVoltMin')
 HI_DRV = ['driverVoltMin', 'driverVoltMax']                        # BESLUT nr 43
 HI = {}
 HI.update({n: ('30', '15') for n in HI_AMP})
-HI.update({n: ('60', '55') for n in HI_VOLT})
+HI.update({n: ('60', HW_VOLT) for n in HI_VOLT})   # BESLUT nr 45: HwVoltMaxCv
+# Falt som redan har ratt hi i kallfilen men ska folja firmware (kontrolleras, andras inte)
+HI_CHECK = {'MaxChargeVolt': HW_VOLT}                            # BESLUT nr 45
 HI.update({n: ('25', '20') for n in HI_DRV})
 
 METHOD = ['Constant current (CC)', 'Constant voltage (CV)', 'Monitor', 'Off']
@@ -100,6 +114,8 @@ OPTS = {
     'chargeMode': ['Auto (type + Ah)', 'Manual stage table s1-s4 (not active)',
                    'Simple CC/CV (charger max values)', 'INVALID'],
     'tempCompEnable': ['Off', 'On (needs battery temp sensor, not active)'],
+    # BESLUT nr 45: index 4..7 ogiltiga
+    'batteryNomVolt': ['6 V', '12 V', '24 V', '36 V', 'INVALID', 'INVALID', 'INVALID', 'INVALID'],
     'batteryType': ['Lead flooded starter (SLI)', 'Lead AGM', 'Lead GEL',
                     'Lead flooded deep cycle', 'Lead calcium/EFB', 'LiFePO4 (unconfirmed)',
                     'Custom (manual)', 'INVALID'],
@@ -135,6 +151,9 @@ def do_constants(t):
                 assert toks[hi].strip() == HI[name][0], (name, toks[hi])
                 set_tok(toks, hi, HI[name][1])
                 done_hi.add(name)
+            if name in HI_CHECK:
+                assert toks[hi].strip() == HI_CHECK[name], (name, toks[hi])
+                done_hi.add(name)
         else:
             if name in OPTS:
                 old = [x.strip().strip('"') for x in toks[4:]]
@@ -144,7 +163,7 @@ def do_constants(t):
                     set_tok(toks, 4 + k, q(o))
                 done_opt[name] = dict(zip(old, new))
         lines[i] = m.group(1) + name + m.group(3) + ','.join(toks)
-    assert done_hi == set(HI), set(HI) - done_hi
+    assert done_hi == set(HI) | set(HI_CHECK), (set(HI) | set(HI_CHECK)) - done_hi
     assert set(done_opt) == set(OPTS), set(OPTS) - set(done_opt)
     assert done_unit == set(UNIT_FIELD)
     t = t[:a] + '\n'.join(lines) + t[b:]
@@ -756,7 +775,7 @@ def ctx():
      ('chargeMode', 'Charge mode. Auto = the firmware calculates all parameters from battery type and capacity (each parameter can be set manually). Manual stage table is not active.'),
      ('tempCompEnable', 'Temperature compensation of absorption and float (ref. 25 ' + DC + '). Not active: no battery temperature sensor.'),
      ('batteryType', 'Battery type, selects the row in the type table. Custom = no auto values, all manual values are used.'),
-     ('batteryNomVolt', 'Nominal battery voltage, gives the cell count (lead 2 V/cell, LiFePO4 3.2 V/cell).'),
+     ('batteryNomVolt', 'Nominal battery voltage, gives the cell count (lead 2 V/cell, LiFePO4 3.2 V/cell). 6, 12, 24 or 36 V; the output is limited to ' + HW_VOLT + ' V.'),
      ('capacityAh', 'Battery capacity C (20 h rating). The only value that must be set in Auto mode.'),
      ('autoAmpCap', 'Current cap in Auto. Effective cap = lowest of this value, the 15 A hardware limit, Max charge current and the sensor range.'),
      ('tailAmpFloor', 'Floor for tail, float and precharge current (ACS712 is uncertain below about 0.5 A).'),

@@ -30,6 +30,8 @@ hdr_add = (
 ";     forladdning foljer inte med; ignoreras vid AH_MISSING/NOMV_INVALID; ingen burn (BESLUT nr 40).\n"
 ";   * Strom 0..15 A i alla stromfalt och matare (BESLUT nr 42), spanning 0..55 V och\n"
 ";     driverVolt 0..20 V (BESLUT nr 43).\n"
+";   * Spanningstak 55 V ut / 65 V in (BESLUT nr 45): ini-max for spanningsfalten hamtas ur\n"
+";     shared/hwLimits.hpp (HwVoltMaxCv). Autolaget erbjuder 6/12/24/36 V; index 4..7 ogiltiga.\n"
 ";   * Presentation (BESLUT nr 44, tools/ini22_ui.py): engelska texter, en teckenkodning\n"
 ";     (ISO-8859-1, bara ASCII + grad-tecknet), framsida med 8 matare + 12 indikatorer,\n"
 ";     ovriga indikatorer som indicatorTemplate, hjalptexter med <br>, Help-meny och\n"
@@ -85,6 +87,11 @@ rep('   indicator = { restrictionBits & 128 }, "Tid-strom", "BEGR: Tid-strom", w
 rep('   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n',
     '   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n'
     '   indicator = { errorBits & 4096 }, "Max Ah i bulk", "FEL: Max laddad Ah i bulk (bulkAhPct)", white, black, red, black\n')
+# BESLUT nr 45: autolaget har 4 nominella spanningar (firmware NomvCount = 4)
+rep('   pa_typeOk            = { (batteryType < 6) && (batteryNomVolt < 5) }\n',
+    '   pa_typeOk            = { (batteryType < 6) && (batteryNomVolt < 4) }\n')
+rep('(batteryNomVolt == 3 ? 12 : (batteryNomVolt == 4 ? 16 : 0))', '(batteryNomVolt == 3 ? 12 : 0)')
+rep('(batteryNomVolt == 3 ? 18 : (batteryNomVolt == 4 ? 24 : 0))', '(batteryNomVolt == 3 ? 18 : 0)')
 # Presentationssteg (BESLUT nr 42-44)
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

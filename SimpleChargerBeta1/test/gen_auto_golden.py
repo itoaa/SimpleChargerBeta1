@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Golden-vektorer for AutoParams (firmware) fran auto_params_v2.2.py.
 
-Referensen ar test/ref/auto_params_v2.2.py (kopia av Drive-filen, md5
-ef56d1755987754a3a591b8dd32f4c74). Skriptet kontrollerar md5, kor
+Referensen ar test/ref/auto_params_v2.2.py (md5 36477a1af53ac70082480ed36e2e9eb2).
+Drive-originalet (md5 ef56d1755987754a3a591b8dd32f4c74) har 48 V kvar; repots kopia
+har 48 V borttagen enligt BESLUT nr 45 och ska laddas upp till Drive av Ola.
+Fallen (rng-sekvensen) ar oforandrade, sa bara rader med nominell spanning
+index 4 (48 V) skiljer sig mot tidigare golden. Skriptet kontrollerar md5, kor
 referensens selftest och skriver en C++-include till stdout. Inget har
 ar slumpmassigt mellan korningar (fast fro), sa utdata ar deterministisk.
 
@@ -12,7 +15,7 @@ import hashlib, importlib.util, io, os, random, sys, contextlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REF = os.path.join(HERE, 'ref', 'auto_params_v2.2.py')
-REF_MD5 = 'ef56d1755987754a3a591b8dd32f4c74'
+REF_MD5 = '36477a1af53ac70082480ed36e2e9eb2'
 
 if hashlib.md5(open(REF, 'rb').read()).hexdigest() != REF_MD5:
     sys.exit('auto_params_v2.2.py har andrats (md5) - uppdatera REF_MD5 medvetet')

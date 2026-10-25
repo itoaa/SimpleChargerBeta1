@@ -151,9 +151,19 @@ Kan kontrolleras i TunerStudio utan laddning (offline-projekt räcker för 10.3.
 | 10.3.5 | Framsidan | 8 mätare och 12 indikatorer. Högerklick på en indikator listar de övriga (indicatorTemplate) [U] | |
 | 10.3.6 | Strömfält, t.ex. Stage 1 current och Manual value för bulk current | Går inte att mata in över 15,00 A | |
 | 10.3.7 | Spänningsfält, t.ex. Stage 1 voltage, och driverVoltMax | Över 55,00 V respektive 20,00 V går inte att mata in | |
-| 10.3.8 | Ladda en .msq eller EEPROM med äldre värden över de nya gränserna (t.ex. 20 A eller 58 V) | Notera hur TS visar och hanterar värdet. Firmware ändrar inte värdet [U] | |
-| 10.3.9 | Med kort: E8 (Copy effective values to stage table) med 48 V bly och MaxChargeVolt = 0 | Stegtabellen kan få 58,80 V, alltså över ini-gränsen 55 V (öppen fråga BESLUT nr 42/43). Notera hur TS visar det | |
+| 10.3.8 | Ladda en .msq eller EEPROM med äldre värden över de nya gränserna (t.ex. 20 A eller 58 V) | Notera hur TS visar och hanterar värdet. Strömvärden ändras inte av firmware. MaxChargeVolt och man_*-spänningar över 55,00 V begränsas till 55,00 V i RAM vid uppstart och vid hel skrivning (BESLUT nr 45), se 10.4.2 [U] | |
+| 10.3.9 | Med kort: E8 (Copy effective values to stage table) med 36 V bly typ 0 och MaxChargeVolt = 0 | Inga spänningar över 55,00 V i stegtabellen (E8 klampar till `HwVoltMaxCv`, BESLUT nr 45) | |
 | 10.3.10 | Battery limits | Dialogen visar fälten och de effektiva mätarna. Ändring i Battery limits syns i Auto mode-dialogerna (samma konstanter) | |
+
+### 10.4 Spänningstak 55 V ut / 65 V in (BESLUT nr 45)
+
+Inget av detta är provat.
+
+| # | Steg | Förväntat | Resultat |
+|---|---|---|---|
+| 10.4.1 | Auto mode → Nominal voltage | Bara 6, 12, 24 och 36 V är giltiga, index 4–7 visas som INVALID. Väljs INVALID: autovarning "INVALID NOMINAL VOLTAGE" och E8 gör inget | |
+| 10.4.2 | Med kort, utan batteri: skriv MaxChargeVolt = 55,00 V och läs tillbaka. Upprepa med en .msq som har 58,00 V | 55,00 V ligger kvar. 58,00 V läses tillbaka som 55,00 V efter skrivning eller omstart. Notera om TS rapporterar att sidan skiljer sig [U] | |
+| 10.4.3 | Med kort, dummylast: MaxChargeVolt 55,00 V, mät utspänningen med extern multimeter | Utspänningen går inte över 55 V (ErrOverVoltOut vid ≥ MaxChargeVolt). Kräver att mätkretsen faktiskt når 55 V [U] | |
 
 ## Ej testbart i v2.2
 
