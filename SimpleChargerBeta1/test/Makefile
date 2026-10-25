@@ -14,6 +14,7 @@ BUILD     = build
 STORE_SRCS = ../shared/crc16.cpp ../shared/eepromStore.cpp ../shared/eepromDefaults.cpp
 HOST_SRCS = test_eeprom.cpp $(STORE_SRCS)
 AUTO_SRCS = test_autoparams.cpp ../shared/autoParams.cpp $(STORE_SRCS)
+CHG_SRCS  = test_charger.cpp ../shared/charger.cpp ../shared/autoParams.cpp $(STORE_SRCS)
 PCMD_SRCS = test_pagecmd.cpp ../shared/pageCommands.cpp ../shared/autoParams.cpp $(STORE_SRCS)
 
 AVR_CXX   = avr-g++
@@ -26,11 +27,16 @@ AVR_SRCS  = avr_probe.cpp ../shared/crc16.cpp ../shared/eepromStore.cpp ../share
 
 all: test
 
-test: $(BUILD)/test_eeprom $(BUILD)/test_autoparams $(BUILD)/test_pagecmd
+test: $(BUILD)/test_eeprom $(BUILD)/test_autoparams $(BUILD)/test_charger $(BUILD)/test_pagecmd
 	./$(BUILD)/test_eeprom
 	./$(BUILD)/test_autoparams
+	./$(BUILD)/test_charger
 	./$(BUILD)/test_pagecmd
 	python3 ref/auto_params_v2.2.py > /dev/null
+
+$(BUILD)/test_charger: $(CHG_SRCS) $(wildcard ../shared/*.hpp)
+	mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) $(CHG_SRCS) -o $@
 
 $(BUILD)/test_pagecmd: $(PCMD_SRCS) $(wildcard ../shared/*.hpp)
 	mkdir -p $(BUILD)
