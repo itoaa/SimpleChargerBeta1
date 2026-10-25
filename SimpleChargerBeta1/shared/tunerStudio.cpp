@@ -1,130 +1,184 @@
+/*
+ * tunerStudio.cpp - protokoll v2.2, se tunerStudio.hpp.
+ */
 #include "tunerStudio.hpp"
-
 #include <string.h>
 
-/* TunerStudio matches these bytes. The trailing NUL is not sent. */
-/* B-2 marks the 14-byte realtime block. An older ini must not read these int16 fields. */
-static const char codeString[] = "MSII s-Charger B-2  ";
-static const char codeRev[] = "Smedby simple Charger Beta 1";
-static const char protocolVersion[] = "001";
+/* TunerStudio jamfor dessa byte. Avslutande NUL skickas inte. */
+static const char codeString[] = "MSII s-Charger 2.2  ";
+static const char codeRev[] = "Smedby simple Charger Beta 1 v2.2";
+static const char protocolVersion[] = "002";
 
-typedef char rtpsSizeCheck[(RTPS == sizeof(RPageVarsStruct)) ? 1 : -1];
-typedef char pg1SizeCheck[(PG1S == sizeof(Page1DataStruct)) ? 1 : -1];
+typedef char tsSigLen[(sizeof(codeString) - 1U == 20U) ? 1 : -1];
 
-TunerStudio::TunerStudio()
-	: state(Idle), pendingOffset(0), pendingCount(0), sendFn(0), sendCtx(0), burnFn(0), burnCtx(0)
+TunerStudio::TunerStudio(EepromStore& store)
+    : store_(store), state_(Idle), page_(0U), offset_(0U), count_(0U), got_(0U),
+      lastByteMs_(0U), sendFn_(0), sendCtx_(0)
 {
-	memset(&page1, 0, sizeof(page1));
-	/* Cap only. Applied duty stays 0 until main sees a voltage limit and a current limit. */
-	page1.MaxPWM = 5;
-	memset(&realtime, 0, sizeof(realtime));
+    hooks_.burn = 0;
+    hooks_.command = 0;
+    hooks_.pageWritten = 0;
+    hooks_.ctx = 0;
+    memset(realtime, 0, sizeof(realtime));
+    memset(chunk_, 0, sizeof(chunk_));
 }
 
 void TunerStudio::setSend(void (*send)(const uint8_t* data, uint8_t len, void* ctx), void* ctx)
 {
-	sendFn = send;
-	sendCtx = ctx;
+    sendFn_ = send;
+    sendCtx_ = ctx;
 }
 
-void TunerStudio::setOnBurn(void (*burn)(void* ctx), void* ctx)
+void TunerStudio::setHooks(const Hooks& hooks)
 {
-	burnFn = burn;
-	burnCtx = ctx;
+    hooks_ = hooks;
 }
 
-void TunerStudio::sendBytes(const uint8_t* data, uint8_t len)
+void TunerStudio::send(const uint8_t* data, uint8_t len)
 {
-	if (sendFn != 0)
-	{
-		sendFn(data, len, sendCtx);
-	}
+    if (sendFn_ != 0)
+    {
+        sendFn_(data, len, sendCtx_);
+    }
 }
 
-void TunerStudio::writePageByte(uint16_t offset, uint8_t value)
+void TunerStudio::applyWrite(const uint8_t* src, uint8_t len)
 {
-	if (offset < PG1S)
-	{
-		reinterpret_cast<uint8_t*>(&page1)[offset] = value;
-	}
+    /* writeBytes gransskontrollerar och andrar inget vid fel. */
+    if (store_.writeBytes(page_, offset_, src, len))
+    {
+        if (hooks_.pageWritten != 0)
+        {
+            hooks_.pageWritten(page_, hooks_.ctx);
+        }
+    }
 }
 
 void TunerStudio::handleCommand(uint8_t command)
 {
-	uint8_t seconds;
-
-	switch (command)
-	{
-	case 'A':
-		sendBytes(reinterpret_cast<const uint8_t*>(&realtime), RTPS);
-		break;
-	case 'c':
-	case 'C':
-		/* One raw byte, not ASCII. */
-		seconds = realtime.seconds;
-		sendBytes(&seconds, 1);
-		break;
-	case 'S':
-		sendBytes(reinterpret_cast<const uint8_t*>(codeRev), (uint8_t)(sizeof(codeRev) - 1));
-		break;
-	case 'Q':
-		sendBytes(reinterpret_cast<const uint8_t*>(codeString), (uint8_t)(sizeof(codeString) - 1));
-		break;
-	case 'F':
-		sendBytes(reinterpret_cast<const uint8_t*>(protocolVersion), (uint8_t)(sizeof(protocolVersion) - 1));
-		break;
-	case 'W':
-		state = WOffset;
-		break;
-	case 'X':
-		state = XOffset;
-		break;
-	case 'B':
-		if (burnFn != 0)
-		{
-			burnFn(burnCtx);
-		}
-		break;
-	case 'V':
-		sendBytes(reinterpret_cast<const uint8_t*>(&page1), PG1S);
-		break;
-	default:
-		break;
-	}
+    uint8_t one;
+    switch (command)
+    {
+    case 'A':
+        send(realtime, (uint8_t)TsLayout::RtBlockSize);
+        break;
+    case 'c':
+    case 'C':
+        one = realtime[TsLayout::RtSeconds];
+        send(&one, 1U);
+        break;
+    case 'S':
+        send(reinterpret_cast<const uint8_t*>(codeRev), (uint8_t)(sizeof(codeRev) - 1U));
+        break;
+    case 'Q':
+        send(reinterpret_cast<const uint8_t*>(codeString), (uint8_t)(sizeof(codeString) - 1U));
+        break;
+    case 'F':
+        send(reinterpret_cast<const uint8_t*>(protocolVersion), (uint8_t)(sizeof(protocolVersion) - 1U));
+        break;
+    case 'V':
+        send(store_.page(page_), (uint8_t)store_.pageSize(page_));
+        break;
+    case 'P':
+        state_ = PPage;
+        break;
+    case 'E':
+        state_ = EData;
+        break;
+    case 'W':
+        state_ = WOffset;
+        break;
+    case 'X':
+        state_ = XOffset;
+        break;
+    case 'B':
+        if (hooks_.burn != 0)
+        {
+            hooks_.burn(hooks_.ctx);
+        }
+        break;
+    default:
+        break;
+    }
 }
 
-void TunerStudio::onByte(uint8_t byte)
+void TunerStudio::poll(uint32_t nowMs)
 {
-	switch (state)
-	{
-	case WOffset:
-		pendingOffset = byte;
-		state = WValue;
-		return;
-	case WValue:
-		writePageByte(pendingOffset, byte);
-		state = Idle;
-		return;
-	case XOffset:
-		pendingOffset = byte;
-		state = XCount;
-		return;
-	case XCount:
-		pendingCount = byte;
-		/* A count of 0 is an empty block. */
-		state = (pendingCount == 0) ? Idle : XData;
-		return;
-	case XData:
-		writePageByte(pendingOffset, byte);
-		pendingOffset++;
-		pendingCount--;
-		if (pendingCount == 0)
-		{
-			state = Idle;
-		}
-		return;
-	case Idle:
-	default:
-		handleCommand(byte);
-		return;
-	}
+    if ((state_ != Idle) && ((uint32_t)(nowMs - lastByteMs_) > (uint32_t)TimeoutMs))
+    {
+        state_ = Idle;
+    }
+}
+
+void TunerStudio::onByte(uint8_t byte, uint32_t nowMs)
+{
+    poll(nowMs);
+    lastByteMs_ = nowMs;
+    switch (state_)
+    {
+    case PPage:
+        if (byte < EepromLayout::PageCount)
+        {
+            page_ = byte;
+        }
+        state_ = Idle;
+        break;
+    case EData:
+        state_ = Idle;
+        if (hooks_.command != 0)
+        {
+            hooks_.command(byte, hooks_.ctx);
+        }
+        break;
+    case WOffset:
+        offset_ = byte;
+        state_ = WValue;
+        break;
+    case WValue:
+        state_ = Idle;
+        applyWrite(&byte, 1U);
+        break;
+    case XOffset:
+        offset_ = byte;
+        state_ = XCount;
+        break;
+    case XCount:
+        count_ = byte;
+        got_ = 0U;
+        if (count_ == 0U)
+        {
+            state_ = Idle;
+        }
+        else if ((count_ > (uint8_t)MaxChunk) ||
+                 ((uint16_t)((uint16_t)offset_ + count_) > store_.pageSize(page_)))
+        {
+            /* Hela blocket avvisas, men datat maste lasas bort. */
+            state_ = XDiscard;
+        }
+        else
+        {
+            state_ = XData;
+        }
+        break;
+    case XData:
+        chunk_[got_] = byte;
+        got_++;
+        if (got_ == count_)
+        {
+            state_ = Idle;
+            applyWrite(chunk_, count_);
+        }
+        break;
+    case XDiscard:
+        got_++;
+        if (got_ == count_)
+        {
+            state_ = Idle;
+        }
+        break;
+    case Idle:
+    default:
+        handleCommand(byte);
+        break;
+    }
 }

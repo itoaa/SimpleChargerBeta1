@@ -3,11 +3,14 @@ MCU = atmega328p
 F_CPU = 16000000UL
 CXX = avr-g++
 CXXFLAGS = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Os -Wall -Wextra -ffunction-sections -fdata-sections -std=gnu++98 \
-	-Ishared -ISmeOS/Atmel328p/include -ISmeOS/Middleware/include
+	-Ishared -ISmeOS/Atmel328p/include -ISmeOS/Middleware/include $(CXXFLAGS_EXTRA)
 LDFLAGS = -mmcu=$(MCU) -Wl,--gc-sections
 
 SRCS = main.cpp \
 	shared/filter.cpp shared/scale.cpp shared/tunerStudio.cpp \
+	shared/crc16.cpp shared/eepromStore.cpp shared/eepromDefaults.cpp \
+	shared/autoParams.cpp shared/pageCommands.cpp shared/charger.cpp \
+	SmeOS/Atmel328p/src/sEeprom.cpp \
 	SmeOS/Atmel328p/src/sADC.cpp SmeOS/Atmel328p/src/sGPIO.cpp \
 	SmeOS/Atmel328p/src/sMillis.cpp SmeOS/Atmel328p/src/sPWM.cpp SmeOS/Atmel328p/src/sSerial.cpp \
 	SmeOS/Middleware/src/sCurrent.cpp SmeOS/Middleware/src/sVolt.cpp

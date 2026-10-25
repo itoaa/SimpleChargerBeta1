@@ -15,7 +15,8 @@
  * Hardvaran abstraheras med EepromBackend (funktionspekare) sa att logiken
  * kan testas pa PC med en mock (test/). AVR-backend: sEeprom.hpp.
  *
- * OBS: modulen ar INTE inkopplad i main.cpp/regulatorn i denna version.
+ * Inkopplad i main.cpp fran etapp 3: load() vid uppstart, burn() endast pa
+ * TS-kommandot B (via BurnGuard), aldrig automatiskt.
  */
 #ifndef EEPROM_STORE_HPP_
 #define EEPROM_STORE_HPP_
@@ -49,11 +50,12 @@ struct BurnGuard
 /* Realtidsdata: ny statusbyte for EEPROM-varningarna (BESLUT.md nr 8 och 21).
  * Laggs efter 114 B-blocket i SPEC_tabeller_v2.2.md (offset 0..113 ar fullt
  * belagda), dvs ochBlockSize 114 -> 115. Bitarna = EepromStore::warnBits().
- * Endast konstanter: protokollet/ini andras inte i denna version. */
+ * Fran etapp 2 ar 115 B infort i protokollet (TsLayout::RtBlockSize) och
+ * i tunerStudio_v2.2.ini; BlockSizeV22 = blockstorleken enligt SPEC_tabeller. */
 namespace EepromRealtime {
-const uint16_t BlockSizeV22     = 114U;  /* nuvarande ochBlockSize i v2.2 */
+const uint16_t BlockSizeV22     = 114U;  /* blocket enligt SPEC_tabeller_v2.2.md */
 const uint16_t WarnBitsOffset   = 114U;  /* eepromWarnBits, U08 */
-const uint16_t BlockSizeProposed = 115U;
+const uint16_t BlockSizeProposed = 115U; /* infort i etapp 2 (A ger 115 B) */
 }
 
 /* Standardvarden for alla sidor i foljd (292 B). Ligger i flash pa AVR. */
