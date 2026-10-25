@@ -11,9 +11,17 @@ set -eu
 ELF="${1:-charger.elf}"
 FLASH_MAX=28672
 RAM_MAX=1229
-set -- $(avr-size -B "$ELF" | awk 'NR==2 {print $1, $2, $3}')
+# Sektionsvis (avr-size -A): nyare binutils redovisar .data under "text"
+# i -B-formatet, vilket underskattar RAM. Har raknas .data i bada.
+set -- $(avr-size -A "$ELF" | awk '
+  $1 == ".text"   {t = $2}
+  $1 == ".data"   {d = $2}
+  $1 == ".bss"    {b = $2}
+  $1 == ".noinit" {n = $2}
+  END {print t + 0, d + 0, b + n + 0}')
 TEXT=$1; DATA=$2; BSS=$3
 FLASH=$((TEXT + DATA)); RAM=$((DATA + BSS))
+echo ".text $TEXT B, .data $DATA B, .bss+.noinit $BSS B"
 echo "flash $FLASH B (grans < $FLASH_MAX), statiskt RAM $RAM B (grans < $RAM_MAX)"
 [ "$FLASH" -lt "$FLASH_MAX" ] || { echo "FEL: flash over gransen"; exit 1; }
 [ "$RAM" -lt "$RAM_MAX" ] || { echo "FEL: statiskt RAM over gransen"; exit 1; }
