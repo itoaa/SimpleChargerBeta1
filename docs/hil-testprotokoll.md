@@ -76,11 +76,20 @@ Inställning: MaxChargeVolt > 0 och lagom låg för dummylasten, chargeMode Enke
 | 6.5 | E1 i Error-läge, sedan E4 (kvittera) | E1 ignoreras. Efter E4: Waiting **utan** att laddning startar (BESLUT nr 27). | |
 | 6.6 | E6 (nollställ strömgivare) i vila | outAmp ≈ 0 efteråt | |
 | 6.7 | E7 (auto → manuell) | man_* på sida 5 = autovärden. ovr-bitar oförändrade. Ingen burn (kontrollera efter omstart). | |
-| 6.8 | E8 | Ingen ändring (inte implementerad, BESLUT nr 28) | |
+| 6.8 | E8 (Kopiera effektiva → stegtabell) i vila, standardvärden och kapacitet satt | Sida 2 s1 = CC/bulkAmp/absorb, s2 = CV/tail, s3 = CV/float, s4 = övervaka (restartMode på) eller av. Byte 0–3 och sida 5 oförändrade. `pageRefreshReq` bit 0x02 är 1 i ca 1 s och TS läser om sida 2. Ingen burn: värdena borta efter omstart utan B (BESLUT nr 40). | |
+| 6.8a | E8 med en override (t.ex. ovr bulkAmp = Manuell, man 25 A) | s1/s2 ström = effektivt värde (begränsat av hårdvarutaket), inte autovärdet | |
+| 6.8b | E8 med kapacitet 0 (AH_MISSING) | Ingen ändring på sida 2. Ingen pageRefreshReq-bit. | |
+| 6.8c | E8 och sedan B i vila, omstart | Stegtabellen finns kvar | |
 | 6.9 | E9 (alla → Auto) | ovr-bitarna = 0 och man_* oförändrade | |
 | 6.10 | MaxChargeVolt = 0 | Utgången av och laddning kan inte startas. TS visar voltLimit 0 med röd indikator (BESLUT nr 33). | |
 | 6.11 | Indikatorn "Max Ah i bulk" (`errorBits` b12, BESLUT nr 36) | Finns i TS och är släckt. Felet kräver Auto-laddning med batteri och testas inte här; det är bara värdtestat. | |
-| 6.12 | Känd risk (förslag 4 i `docs/forslag-2-3-4-6.md`): Enkel-läge med dummylast där utspänningen når MaxChargeVolt | Notera om utgången slår av/på (felbit OverVoltOut blinkar, duty hoppar till 0). I värdsimulering pendlar den. Ingen åtgärd är implementerad. | |
+| 6.12 | Regleringsmarginal (BESLUT nr 38): Enkel-läge med dummylast, ChargeVolt = MaxChargeVolt | Utspänningen regleras mot MaxChargeVolt − 0,10 V. Ingen av/på-pendling: OverVoltOut blinkar inte och duty hoppar inte till 0. | |
+| 6.12a | Samma med ström: ChargeAmp ≥ MaxChargeAmp | Strömmen regleras mot MaxChargeAmp − 0,20 A, utan hård brytning | |
+| 6.12b | Spärrtid efter hård brytning: provocera överspänning (sänk MaxChargeVolt under utspänningen) | Duty 0 och felbit enligt 6.4. Efter kvittering och start: utgången hålls av i minst 1 s **och** tills U < MaxChargeVolt − 0,20 V (respektive I < MaxChargeAmp − 0,40 A). Mät med oscilloskop. | |
+| 6.13 | Strömgivare typ 3 (30 A), `restrictionBits` b9 (BESLUT nr 37) | Indikatorn "STROMGIVARE MATTAD" släckt vid normal ström. Mättnad (>32,767 A) kräver extern strömkälla: utan den testas b9 inte, den är bara värdtestad. | |
+| 6.14 | Byt `currentSensor` på sida 3 utan omstart (BESLUT nr 39) | Gul indikator "STROMGIVARTYP ANDRAD" (b10) tänds. E1 startar inte, och en väntande starttimer startar inte. outAmp skalas fortfarande med boot-typen. | |
+| 6.14a | Samma under pågående laddning | Laddningen fortsätter med boot-typen. Efter stopp (E2) går den inte att starta. | |
+| 6.14b | B och sedan E5 | b10 släckt. Ny typ används för skalning och autoparametrar. | |
 
 ## 7. pageRefresh (triggeredPageRefresh) – se även 10.2
 
@@ -94,7 +103,7 @@ Inställning: MaxChargeVolt > 0 och lagom låg för dummylasten, chargeMode Enke
 
 | # | Steg | Förväntat | Resultat |
 |---|---|---|---|
-| 8.1 | Stack-painting: fyll RAM mellan `__heap_start` och SP med ett mönster vid uppstart (separat testbygge), kör 4.1, 6.1–6.9 och 7.1, läs ut minsta orörda adress | Använd stack < 1 182 B. Statisk uppskattning 368 B [U] (BESLUT nr 32). | |
+| 8.1 | Stack-painting: fyll RAM mellan `__heap_start` och SP med ett mönster vid uppstart (separat testbygge), kör 4.1, 6.1–6.9 (inkl. 6.8 E8) och 7.1, läs ut minsta orörda adress | Använd stack < 1 182 B. Statisk uppskattning 384 B [U] (BESLUT nr 32; längsta väg nu E8 via PageCommands::apply). | |
 | 8.2 | Loopens tid med oscilloskop på gröna LED:n (låg under mätning och reglering) | Noteras. loopTimeUs i realtime är 0 (inte implementerat). | |
 | 8.3 | A-svar (115 B vid 115 200 baud ≈ 10 ms) under laddning | Ingen märkbar störning i regleringen | |
 
@@ -131,4 +140,4 @@ Firmware håller biten i cirka 1 s (`RefreshHoldMs` 1000) efter E7/E9. Det är o
 
 ## Ej testbart i v2.2
 
-Temperaturer (visas som 0 = ej tillgänglig), ingångsström, temperaturkompensering, SoftStart/PauseTemp, diagMode 1 och E8. Se BESLUT nr 30 och 34.
+Temperaturer (visas som 0 = ej tillgänglig), ingångsström, temperaturkompensering, SoftStart/PauseTemp och diagMode 1. Att stegtabellen *används* (chargeMode 1) är inte implementerat, men E8 fyller den (6.8). Se BESLUT nr 30, 34 och 40.

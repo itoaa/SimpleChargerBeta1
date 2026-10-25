@@ -1,6 +1,17 @@
 # Förslag 2, 3, 4 och 6 (väntar på godkännande, inte implementerade)
 
-Status: **bara förslag.** Ingen firmware-logik är ändrad för punkterna nedan. Numreringen följer Olas uppdrag 2026-10-25. [U] betyder uppskattning eller antagande som inte är verifierat. Inget här är provat på hårdvara eller i TunerStudio.
+Status: **godkänt och implementerat.** Ola godkände förslag 2, 3, 4 och 6 som de står (via Max, 2026-10-25 11:48). Implementering: förslag 3 = BESLUT nr 37, förslag 4 = nr 38, förslag 6 = nr 39, förslag 2 = nr 40. Texten nedan är förslaget som det godkändes. Avvikelser vid implementeringen:
+
+- **Förslag 2:** kodskissen anropar `compute(..., true)`, alltså ignorerade overrides, men texten och testfall 2 kräver effektiva värden med override. Implementerat utan ignoreOverrides, vilket följer texten. Flash ökade med cirka 1,3 kB mot uppskattade 250–350 B [U].
+- **Förslag 4:**
+  - Bulk-slutgränsen blir min(absorb, MCV − 0,10 V), annars når Auto aldrig bulk-slut när MCV = absorption.
+  - Spärrtiden nollas inte av stopp eller start.
+  - Marginalen hjälper bara om ett regleringssteg är mindre än marginalen [U].
+- **Förslag 6:**
+  - En pågående laddning avbryts inte, och omstart från övervakning nekas.
+  - Starttimern stannar på 0 tills omstart.
+
+Numreringen följer Olas uppdrag 2026-10-25. [U] betyder uppskattning eller antagande som inte är verifierat. Inget här är provat på hårdvara eller i TunerStudio.
 
 Källor:
 - `SPEC_v2.2.md` och `SPEC_tabeller_v2.2.md` (Drive)
@@ -256,8 +267,8 @@ Kostnad cirka 40–80 B flash och 1 B RAM [U].
 | Bit | Förslag | Status |
 |---|---|---|
 | restrictionBits b8 | Avvisad B | **Införd** (BESLUT nr 35) |
-| restrictionBits b9 | Strömmätning mättad (förslag 3) | Förslag |
-| restrictionBits b10 | Givartyp ändrad, omstart krävs (förslag 6) | Förslag |
+| restrictionBits b9 | Strömmätning mättad (förslag 3) | **Införd** (BESLUT nr 37) |
+| restrictionBits b10 | Givartyp ändrad, omstart krävs (förslag 6) | **Införd** (BESLUT nr 39) |
 | errorBits b12 | bulkAhPct (BulkAh) | **Införd** (BESLUT nr 36) |
 
 `ochBlockSize` 115 och layouten i nr 21 påverkas inte av något förslag.

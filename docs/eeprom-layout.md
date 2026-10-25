@@ -115,6 +115,19 @@ Indikatorn ligger **inte** i `eepromWarnBits`, eftersom alla 8 bitar där är up
 - **Nollas inte** när laddningen tar slut. Den blockerar inte start.
 - `ochBlockSize` är fortfarande 115 och inga offset har ändrats. b0–b7 i restrictionBits skrivs av laddaren som förut, och main.cpp lägger till b8 med `tsRtSetBurnRejected()`.
 
+### Fler restrictionBits (BESLUT.md nr 37 och 39)
+
+| Offset | Kanal | Bit | Mask | Källa | Betydelse |
+|---|---|---|---|---|---|
+| 6 (U16) | `restrictionBits` | b9 | 0x0200 | `Current::saturated()` via `tsRtSetRestr()` | strömmätningen klampad till ±32 767 mA (typ 3, 30 A). Biten sätts och nollas i varje mätvarv och blockerar ingenting. |
+| 6 (U16) | `restrictionBits` | b10 | 0x0400 | `Charger::update()` (RestrSensorRestart) | `currentSensor` på sida 3 skiljer sig från värdet vid uppstart, så omstart (E5) krävs. Start nekas och väntande starttimer står kvar på 0. En laddning som redan pågår avbryts inte. |
+
+Strömgivartypen läses en gång vid uppstart, efter `load()` (BESLUT nr 39). Både skalning och autoparametrar använder boot-värdet tills omstart. Fortfarande `ochBlockSize` 115 och oförändrade offset.
+
+### E8 och sida 2 (BESLUT.md nr 40)
+
+E8 skriver sida 2 byte 4..83 (stegtabellen s1–s4, 4 × 20 B) **i RAM**: s1 bulk, s2 absorption, s3 float, s4 övervaka eller av. Byte 0..3 (startMode, restartMode, startDelayMin) och sida 1, 3, 4 och 5 rörs inte. Ingen EEPROM-skrivning; ändringen sparas bara om användaren trycker B. Sidlayouten och stegens fältordning är oförändrade.
+
 
 ## Standardvärden för tabeller (BESLUT.md nr 22)
 
