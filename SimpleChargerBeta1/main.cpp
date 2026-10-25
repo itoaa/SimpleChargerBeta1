@@ -129,7 +129,8 @@ static void uartSend(const uint8_t* data, uint8_t len, void* ctx)
 
 static void onBurn(void*)
 {
-	/* Resultatet syns via eepromWarnBits (BurnFailed) i realtime 114. */
+	/* Resultatet syns via eepromWarnBits (BurnFailed) i realtime 114 och,
+	 * vid avvisning under laddning, restrictionBits b8 (BESLUT nr 35). */
 	(void)gStore.burn();
 }
 
@@ -320,6 +321,8 @@ int main()
 			putU16(rt, TsLayout::RtDriverVoltAdc, driverVolt.getLastADCValue());
 			gCharger.writeRealtime(rt);
 			AutoParams::writeRealtime(gAuto, rt);
+			/* B avvisad under laddning -> restrictionBits b8 (BESLUT nr 35). */
+			tsRtSetBurnRejected(rt, gStore.burnRejectedCharging());
 			rt[TsLayout::RtPageRefreshReq] = gApp.refresh;
 			rt[TsLayout::RtEepromWarnBits] = gStore.warnBits();
 

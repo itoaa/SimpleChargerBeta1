@@ -22,6 +22,8 @@ hdr_add = (
 ";     'Hogsta spanning' visar da 0 i stallet for 15,00 V (nya kanaler voltLimitShown/\n"
 ";     pcVoltLimitShown, ny matare voltLimitNowG) och en rod indikator visas. eff_voltLimit och pa_voltLimit ar\n"
 ";     oforandrade, sa pa_diffCount jamfor som forut.\n"
+";   * restrictionBits b8 = B avvisad under laddning, andringar inte sparade (BESLUT nr 35).\n"
+";   * errorBits b12 = bulkAhPct overskriden, egen bit i stallet for b9 (BESLUT nr 36).\n"
 "; Firmware-tolkning av %o/%c: 1 byte vardera (sidor <= 255 B). Inte testad i riktig TunerStudio.\n"
 "; Compat-filerna (tunerStudio.ini, SmedbyCharger_compat.ini) ar OFORANDRADE.\n"
 "; -------------------------------------------------------------------------------------\n")
@@ -58,4 +60,17 @@ ind = ("   indicator = { mcvOutputOff }, \"MaxChargeVolt satt\", \"UTGANG AV: Ma
        "   indicator = { eepromWarnBits & 64 }, \"Burn ok\", \"EEPROM: burn misslyckades\", white, black, red, black\n"
        "   indicator = { eepromWarnBits & 128 }, \"EEPROM-backend ok\", \"EEPROM: ingen backend\", white, black, red, black\n")
 t = t[:anchor.end()] + ind + t[anchor.end():]
+# BESLUT nr 35/36: nya bitar i lediga delar av restrictionBits (b8) och errorBits (b12)
+rep("b6 PWM-tak, b7 tid-strom.\n   restrictionBits ",
+    "b6 PWM-tak, b7 tid-strom. FIRMWARE (BESLUT nr 35): b8 senaste B avvisad (laddning pagick) - andringar inte sparade, nollas av nasta burn.\n   restrictionBits ")
+rep("b10 batteri saknas/omvant, b11 strommsensor-nollfel.\n   errorBits ",
+    "b10 batteri saknas/omvant, b11 strommsensor-nollfel. FIRMWARE (BESLUT nr 36): b12 max laddad Ah i bulk (bulkAhPct).\n   errorBits ")
+rep('   errorBitsGauge         = errorBits, "Felbitar", "", 0, 4095, ',
+    '   errorBitsGauge         = errorBits, "Felbitar", "", 0, 8191, ')
+rep('   indicator = { restrictionBits & 128 }, "Tid-strom", "BEGR: Tid-strom", white, black, yellow, black\n',
+    '   indicator = { restrictionBits & 128 }, "Tid-strom", "BEGR: Tid-strom", white, black, yellow, black\n'
+    '   indicator = { restrictionBits & 256 }, "Ingen avvisad burn", "BURN AVVISAD: laddning pagar - andringar inte sparade", white, black, yellow, black\n')
+rep('   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n',
+    '   indicator = { errorBits & 2048 }, "Strommsensor nollfel", "FEL: Strommsensor nollfel", white, black, red, black\n'
+    '   indicator = { errorBits & 4096 }, "Max Ah i bulk", "FEL: Max laddad Ah i bulk (bulkAhPct)", white, black, red, black\n')
 open(dst, 'w', encoding='latin-1', newline='').write(t)

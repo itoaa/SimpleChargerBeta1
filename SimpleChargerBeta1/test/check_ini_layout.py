@@ -78,6 +78,18 @@ for i, k in enumerate(('Page1Size', 'Page2Size', 'Page3Size', 'Page4Size', 'Page
     else:
         errors.append('pageSize saknas i ini')
 
+# Bitar i errorBits/restrictionBits (hex-konstanter Err*/Restr*) mot ini-indikatorerna
+# { errorBits & N } / { restrictionBits & N }. Fangar b12 bulkAhPct (BESLUT nr 36)
+# och b8 burn avvisad (BESLUT nr 35).
+hexc = dict((m.group(1), int(m.group(2), 16)) for m in re.finditer(
+    r'const\s+uint16_t\s+(\w+)\s*=\s*0x([0-9A-Fa-f]+)U', open(os.path.join(ROOT, 'shared', 'tsLayout.hpp')).read()))
+initext = open(INI, encoding='latin-1').read()
+for prefix, chan in (('Err', 'errorBits'), ('Restr', 'restrictionBits')):
+    fw = sorted(v for k, v in hexc.items() if k.startswith(prefix))
+    ini = sorted(int(x) for x in re.findall(r'indicator = \{ %s & (\d+) \}' % chan, initext))
+    expect('%s-bitar (indikatorer)' % chan, fw, ini)
+    expect('%s-bitar unika' % chan, len(set(fw)), len(fw))
+
 for e in errors:
     print('FEL:', e)
 print('check_ini_layout: %d kontroller, %d fel (%s)' % (checked, len(errors), os.path.basename(INI)))

@@ -195,7 +195,7 @@ void Charger::autoStep(const Measure& m, uint16_t absCv, uint16_t floatCv,
                  /* cAh * 10 >= dAh * pct (kapacitet 0,1 Ah, pct %) */
                  ((stageCAh * 10UL) >= ((uint32_t)capDAh * (uint32_t)e[AutoParams::BulkAhPct])))
         {
-            fail(ErrMaxTime);
+            fail(ErrBulkAh);   /* egen bit, BESLUT nr 36 */
         }
         else {}
         break;

@@ -44,7 +44,7 @@ const uint8_t DiagPageIndex = 2U; /* sida 3 */
 }
 
 EepromStore::EepromStore(const EepromBackend& backend)
-    : backend_(backend), warn_(0U)
+    : backend_(backend), warn_(0U), burnRejected_(false)
 {
     guard_.chargingActive = 0;
     guard_.outputOff = 0;
@@ -181,8 +181,10 @@ EepromStore::BurnResult EepromStore::burn()
     }
     if (guard_.chargingActive(guard_.ctx))
     {
+        burnRejected_ = true;   /* BESLUT nr 35: visas som restrictionBits b8 */
         return BurnRejectedCharging;
     }
+    burnRejected_ = false;      /* burnen kommer forbi villkoren */
 
     guard_.outputOff(guard_.ctx);
     const bool ok = writeAndVerify();

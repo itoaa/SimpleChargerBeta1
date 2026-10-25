@@ -592,6 +592,7 @@ static void testBurnGuard()
     CHECK(s.burn() == EepromStore::BurnRejectedNoGuard);
     CHECK(g_mock.updateCalls == 0U);
     CHECK(s.warnBits() == w0);
+    CHECK(!s.burnRejectedCharging());                         /* NoGuard satter inte b8 */
 
     /* Guard med saknad chargingActive eller outputOff raknas som ingen guard */
     BurnGuard half = mockGuard();
@@ -615,6 +616,7 @@ static void testBurnGuard()
     CHECK(g_guard.offCalls == 0U && g_guard.restoreCalls == 0U && g_guard.outputOn);
     CHECK(g_mock.updateCalls == 0U && g_mock.bytesWritten == 0U);
     CHECK(s.warnBits() == w0);
+    CHECK(s.burnRejectedCharging());                          /* BESLUT nr 35 */
 
     /* Ingen laddning: av -> skriv -> aterstall, i den ordningen */
     g_guard.reset();
@@ -628,6 +630,7 @@ static void testBurnGuard()
     CHECK(!g_guard.outputOnDuringWrite);
     CHECK(g_guard.outputOn);
     CHECK(s.warnBits() == 0U);                                /* BESLUT.md nr 8 */
+    CHECK(!s.burnRejectedCharging());                         /* nollas av burn forbi villkoren */
 
     /* Verifieringsfel: utgangen aterstalls anda, BurnErrorVerify */
     g_mock.reset(0xFFU);
@@ -639,6 +642,13 @@ static void testBurnGuard()
     CHECK(f.burn() == EepromStore::BurnErrorVerify);
     CHECK(g_guard.offCalls == 1U && g_guard.restoreCalls == 1U && g_guard.outputOn);
     CHECK(!g_guard.outputOnDuringWrite);
+    CHECK((f.warnBits() & EepromStore::WarnBurnFailed) != 0U);
+    CHECK(!f.burnRejectedCharging());
+    /* avvisning -> verifieringsfel: b8 nollas, WarnBurnFailed tar over */
+    g_guard.reset(); g_guard.charging = true; g_mock.guard = &g_guard;
+    CHECK(f.burn() == EepromStore::BurnRejectedCharging && f.burnRejectedCharging());
+    g_guard.charging = false;
+    CHECK(f.burn() == EepromStore::BurnErrorVerify && !f.burnRejectedCharging());
     CHECK((f.warnBits() & EepromStore::WarnBurnFailed) != 0U);
 
     /* outputRestore = 0 ar tillatet (utgangen lamnas av) */

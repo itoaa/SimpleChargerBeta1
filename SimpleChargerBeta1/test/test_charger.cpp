@@ -337,6 +337,7 @@ static void testAutoTimeouts()
         StateIs err = { StateError };
         uint32_t t = s.runUntil(err, 3600000U);
         CHECK(s.ch.state() == StateError && t <= 5U * 60000U + 200U);
+        CHECK((s.ch.errorBits() & ErrMaxTime) != 0U && (s.ch.errorBits() & ErrBulkAh) == 0U);
     }
     /* bulkAhPct: 10 % av 60 Ah = 6 Ah */
     {
@@ -350,6 +351,14 @@ static void testAutoTimeouts()
         s.runUntil(err, 5U * 3600000U);
         CHECK(s.ch.state() == StateError);
         CHECK(rt16(s, RtAmpHours) >= 600U && rt16(s, RtAmpHours) <= 610U);
+        /* BESLUT nr 36: egen bit b12, inte ErrMaxTime */
+        CHECK(s.ch.errorBits() == ErrBulkAh);
+        CHECK(s.ch.latchedErrorBits() == ErrBulkAh);
+        CHECK((rt16(s, RtErrorBits) & ErrBulkAh) != 0U && (rt16(s, RtErrorBits) & ErrMaxTime) == 0U);
+        CHECK((rt16(s, RtLatchedErrorBits) & ErrMaxTime) == 0U);
+        /* E4 kvitterar som for ovriga fel */
+        s.ch.command(4U); s.tick();
+        CHECK(s.ch.state() == StateWaiting && s.ch.errorBits() == 0U);
     }
     /* forladdning max */
     {
@@ -471,6 +480,71 @@ static void testCountersAndDiag()
     CHECK(!s.ch.command(5U) && !s.ch.command(9U) && !s.ch.command(0U));
 }
 
+/* BESLUT nr 35: B avvisad under laddning -> restrictionBits b8 */
+static bool g_simCharging(void* c) { return static_cast<Sim*>(c)->ch.chargingActive(); }
+static void g_simOff(void* c) { static_cast<Sim*>(c)->ch.forceOff(); }
+
+static uint16_t rtRestr(const Sim& s, const EepromStore& st)
+{
+    uint8_t rt[RtBlockSize]; memset(rt, 0, sizeof(rt)); s.ch.writeRealtime(rt);
+    tsRtSetBurnRejected(rt, st.burnRejectedCharging());
+    return scGetU16le(rt + RtRestrictionBits);
+}
+
+static void testBurnRejectedIndicator()
+{
+    CHECK(RestrBurnRejected == 0x0100U && ErrBulkAh == 0x1000U);
+    CHECK((RestrBurnRejected & 0x00FFU) == 0U);       /* SPEC b0..b7 orords */
+    CHECK((ErrBulkAh & 0x0FFFU) == 0U);               /* SPEC b0..b11 orords */
+
+    /* hjalparen andrar bara b8 */
+    {
+        uint8_t rt[RtBlockSize]; memset(rt, 0xA5, sizeof(rt));
+        tsRtSetBurnRejected(rt, true);
+        CHECK(scGetU16le(rt + RtRestrictionBits) == (uint16_t)(0xA5A5U | 0x0100U));
+        tsRtSetBurnRejected(rt, false);
+        CHECK(scGetU16le(rt + RtRestrictionBits) == (uint16_t)(0xA5A5U & ~0x0100U));
+        CHECK(rt[RtRestrictionBits - 1U] == 0xA5U && rt[RtErrorBits] == 0xA5U);
+    }
+
+    EepromStore st(be());
+    setupStore(st, 1500U);
+    st.page(4)[P5ModeBits] = (uint8_t)((st.page(4)[P5ModeBits] & ~3U) | ChargeModeSimple);
+    Sim s(st); s.recompute();
+    BurnGuard g; g.chargingActive = g_simCharging; g.outputOff = g_simOff; g.outputRestore = 0; g.ctx = &s;
+    st.setBurnGuard(g);
+    CHECK(!st.burnRejectedCharging() && (rtRestr(s, st) & RestrBurnRejected) == 0U);
+
+    /* laddning pagar: B avvisas, b8 satts, laddningen fortsatter */
+    s.ch.command(1U); s.run(1000U);
+    CHECK(s.ch.chargingActive());
+    CHECK(st.burn() == EepromStore::BurnRejectedCharging);
+    CHECK(st.burnRejectedCharging());
+    CHECK((rtRestr(s, st) & RestrBurnRejected) != 0U);
+    CHECK(s.ch.chargingActive() && s.ch.duty() > 0U);
+    CHECK(st.warnBits() == 0U);                      /* layout nr 21: eepromWarnBits orord */
+    s.run(1000U);
+    CHECK((rtRestr(s, st) & RestrBurnRejected) != 0U);   /* kvar tills ny burn */
+
+    /* laddning stoppad: biten ligger kvar (andringarna ar fortfarande osparade) */
+    s.ch.command(2U); s.tick();
+    CHECK(!s.ch.chargingActive());
+    CHECK((rtRestr(s, st) & RestrBurnRejected) != 0U);
+    (void)s.ch.command(1U);                          /* b8 blockerar inte start */
+    s.tick();
+    CHECK(s.ch.state() == StateCharging);
+    s.ch.command(2U); s.tick();
+
+    /* nasta burn som kommer forbi villkoren nollar biten */
+    /* (nop-backend: verifieringsfel; b8 nollas anda, WarnBurnFailed tar over) */
+    CHECK(st.burn() == EepromStore::BurnErrorVerify);
+    CHECK(!st.burnRejectedCharging() && (rtRestr(s, st) & RestrBurnRejected) == 0U);
+
+    /* avvisning utan guard (BurnRejectedNoGuard) satter inte biten */
+    EepromStore ng(be());
+    CHECK(ng.burn() == EepromStore::BurnRejectedNoGuard && !ng.burnRejectedCharging());
+}
+
 int main()
 {
     testBootOffAndMcvZero();
@@ -482,6 +556,7 @@ int main()
     testAutoStartOnConnect();
     testTimerStart();
     testCountersAndDiag();
+    testBurnRejectedIndicator();
     printf("test_charger: %d kontroller, %d fel\n", g_checks, g_fails);
     return (g_fails == 0) ? 0 : 1;
 }

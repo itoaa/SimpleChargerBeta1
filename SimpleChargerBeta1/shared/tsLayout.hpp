@@ -132,6 +132,9 @@ const uint16_t ErrBatTemp       = 0x0100U;
 const uint16_t ErrMaxTime       = 0x0200U;
 const uint16_t ErrNoBattery     = 0x0400U;
 const uint16_t ErrAmpZero       = 0x0800U;
+/* b12: bulkAhPct overskriden (BESLUT nr 36). Egen bit, delas inte med
+ * ErrMaxTime. Tillagg: SPEC_tabeller definierar b0..b11, b12..b15 lediga. */
+const uint16_t ErrBulkAh        = 0x1000U;
 
 /* restrictionBits (offset 6) */
 const uint16_t RestrMaxOutAmp   = 0x0001U;
@@ -142,6 +145,9 @@ const uint16_t RestrLowInVolt   = 0x0010U;
 const uint16_t RestrMaxOutVolt  = 0x0020U;
 const uint16_t RestrPwmCap      = 0x0040U;
 const uint16_t RestrAmpTime     = 0x0080U;
+/* b8: senaste B avvisades (laddning pagick), andringar inte sparade.
+ * Tillagg i den lediga hoga byten (BESLUT nr 35), satts av main, inte av Charger. */
+const uint16_t RestrBurnRejected = 0x0100U;
 
 } /* namespace TsLayout */
 
@@ -173,6 +179,22 @@ static inline int8_t scGetS8(const uint8_t* p)
     int8_t s;
     memcpy(&s, p, 1);
     return s;
+}
+
+/* Lagg in RestrBurnRejected (b8) i restrictionBits i realtidsblocket efter
+ * Charger::writeRealtime (BESLUT nr 35). Ovriga bitar orors. */
+static inline void tsRtSetBurnRejected(uint8_t* rt, bool rejected)
+{
+    uint16_t r = scGetU16le(rt + TsLayout::RtRestrictionBits);
+    if (rejected)
+    {
+        r = (uint16_t)(r | TsLayout::RestrBurnRejected);
+    }
+    else
+    {
+        r = (uint16_t)(r & (uint16_t)~TsLayout::RestrBurnRejected);
+    }
+    scPutU16le(rt + TsLayout::RtRestrictionBits, r);
 }
 
 #endif /* TS_LAYOUT_HPP_ */

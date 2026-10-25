@@ -64,7 +64,7 @@ Ordningen är följande:
 4. `outputOff()` anropas, sedan skrivs och verifieras sidorna, och sist anropas `outputRestore()`. Återställningen sker alltid, även vid verifieringsfel.
 5. Resultatet blir `BurnOk`, som nollar varningsbitarna, eller `BurnErrorVerify`, som sätter `WarnBurnFailed`.
 
-Vid avvisning ändras varken EEPROM, utgången eller varningsbitarna. Testet `testBurnGuard` kontrollerar ordningen med en mock: ingen skrivning sker medan utgången är på.
+Vid avvisning ändras varken EEPROM, utgången eller varningsbitarna. Vid `BurnRejectedCharging` sätts i stället flaggan `burnRejectedCharging()` (BESLUT.md nr 35, se nedan). Testet `testBurnGuard` kontrollerar ordningen med en mock: ingen skrivning sker medan utgången är på.
 
 En skrivning av hela layouten tar ungefär 308 × 3,3 ms ≈ 1 s. Det gäller bara när alla byte ändras. Siffran 3,3 ms per byte kommer från databladets tabell 8-2. Utgången är av under hela den tiden.
 
@@ -73,7 +73,7 @@ Inkopplingen i `main.cpp` (etapp 3):
 - `chargingActive` = `Charger::chargingActive()`: tillstånd i {Timer, SoftStart, Charging, PauseTemp}, eller duty > 0, eller diagMode == 1 (BESLUT.md nr 25).
 - `outputOff` sätter duty (OCR) till 0.
 - `outputRestore` sätter tillbaka laddarens aktuella duty. Eftersom B bara tillåts när laddning inte pågår är den i praktiken 0.
-- Resultatet av B syns bara via `eepromWarnBits` (b6 BurnFailed). En avvisad B ger ingen återkoppling i TunerStudio (öppen fråga, se BESLUT.md nr 26).
+- Resultatet av B syns via `eepromWarnBits` (b6 BurnFailed). En B som avvisas för att laddning pågår syns som `restrictionBits` b8 (offset 6), se nedan och BESLUT.md nr 35.
 - Kopieringsknapparna E7–E9 ändrar bara RAM-kopian. De bränner aldrig.
 - Vid uppstart: ogiltiga sidor ersätts med standardvärden och varningsbitar sätts, diagMode tvingas till Normal och laddaren startar AV.
 
@@ -100,7 +100,21 @@ Bitar:
 | b6 | 0x40 | BurnFailed | senaste B-verifiering misslyckades |
 | b7 | 0x80 | NoBackend | ingen EEPROM-backend (internt fel) |
 
-En lyckad B nollar alla bitar. En avvisad B (laddning pågår) ändrar dem inte. Om TunerStudio ska visa "B avvisad" kan det läggas till senare, till exempel som ett svar på B. Det är inte bestämt.
+En lyckad B nollar alla bitar. En avvisad B (laddning pågår) ändrar dem inte. Layouten ovan är oförändrad sedan beslut nr 21.
+
+### Avvisad B under laddning (BESLUT.md nr 35)
+
+Indikatorn ligger **inte** i `eepromWarnBits`, eftersom alla 8 bitar där är upptagna. Den ligger i en befintlig statusbyte i realtidsblocket:
+
+| Offset | Kanal | Bit | Mask | Källa | Betydelse |
+|---|---|---|---|---|---|
+| 6 (U16) | `restrictionBits` | b8 | 0x0100 | `EepromStore::burnRejectedCharging()` | senaste B avvisades för att laddning pågick, så ändringarna i RAM är inte sparade |
+
+- **Sätts** vid `BurnRejectedCharging`.
+- **Nollas** av nästa B som kommer förbi villkoren (`BurnOk`, eller `BurnErrorVerify`, då b6 BurnFailed tar över) och vid omstart.
+- **Nollas inte** när laddningen tar slut. Den blockerar inte start.
+- `ochBlockSize` är fortfarande 115 och inga offset har ändrats. b0–b7 i restrictionBits skrivs av laddaren som förut, och main.cpp lägger till b8 med `tsRtSetBurnRejected()`.
+
 
 ## Standardvärden för tabeller (BESLUT.md nr 22)
 

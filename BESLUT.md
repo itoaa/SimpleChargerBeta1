@@ -148,7 +148,7 @@ Beslut 25–34 nedan är **implementationsval i etapp 2–5 och 7 (2026-10-25)**
 
 ## 26. B i main.cpp (2026-10-25)
 - B anropar `EepromStore::burn()` via BurnGuard. Utgången stängs av (OCR 0) före skrivningen och sätts tillbaka till laddarens duty efter. Eftersom B bara tillåts när `chargingActive` är falsk är den duty i praktiken 0.
-- Resultatet syns bara i realtime 114 `eepromWarnBits`. **Öppen fråga:** en avvisad B (laddning pågår) ger ingen återkoppling i TunerStudio, och varningsbitarna ändras inte.
+- Resultatet syns i realtime 114 `eepromWarnBits`. En avvisad B (laddning pågår) ändrar inte varningsbitarna. *Besvarad 2026-10-25:* den visas i stället som restrictionBits b8, se nr 35.
 - Kopieringsknapparna E7–E9 ändrar bara RAM-kopian och bränner aldrig.
 
 ## 27. Startsemantik (2026-10-25)
@@ -195,20 +195,21 @@ Temperaturkompensering är inaktiv eftersom det inte finns någon batteritempera
 | Steg | Namn | Slut |
 |---|---|---|
 | 0 | Förladdning (CC prechargeAmp) | V > prechargeVolt; prechargeMaxTime → fel MaxTime |
-| 1 | Bulk (CC bulkAmp) | V ≥ absorb; bulkMaxTime eller bulkAhPct → fel MaxTime |
+| 1 | Bulk (CC bulkAmp) | V ≥ absorb; bulkMaxTime → fel MaxTime; bulkAhPct → fel BulkAh (nr 36) |
 | 2 | Absorption (CV absorb) | I < tail i absorbMinTime s, eller absorbMaxTime |
 | 3 | Float (CV float) | floatMaxTime (0 = obegränsat) |
 | 4 | Övervaka (utgång av, tillstånd Done) | Omstart till steg 1 när V < restartVolt (12,5 V-standard) och omstart är på |
 
 - Tidsgränserna är i minuter och totalMaxTime gäller hela laddningen. Timern nollställs vid omstart från Övervaka.
 - I Enkel-läge är steget alltid 0.
-- **Öppen fråga:** när bulkAhPct överskrids används felbiten MaxTime, eftersom någon egen bit saknas.
+- *Besvarad 2026-10-25:* när bulkAhPct överskrids sätts en egen felbit, errorBits b12 `ErrBulkAh` (nr 36). MaxTime används bara för tidsgränserna.
 
 ## 32. Resursmätning (2026-10-25)
 - `tools/check_size.sh` läser sektionerna (`avr-size -A`). `-B`-formatet i nyare binutils redovisar `.data` under text, och då underskattades RAM: master rapporterades som 90 B mot verkliga 182 B.
 - avr-gcc 14.2.0 (lokalt): flash 7 238 → 18 296 B (gräns 28 672 B), statiskt RAM 182 → 866 B (gräns 1 229 B). Båda är **mätta** med avr-size.
 - CI (Ubuntus gcc-avr): flash 18 440 B, statiskt RAM 864 B.
 - Stack: **uppskattad** till 368 B [U] med `tools/stack_estimate.py`. Värsta kedjan är main → pollSerial → TunerStudio → onCommand → PageCommands::apply → AutoParams::compute, plus värsta ISR och 32 B schablon för biblioteket. Det lämnar cirka 800 B marginal av 2 048 − 866 = 1 182 B.
+- Efter nr 35/36 (lokalt): flash 18 350 B och statiskt RAM 867 B (+54 B / +1 B), mätt med avr-size. Stacken uppskattas fortfarande till 368 B [U].
 - Ingen stack-painting är gjord, eftersom hårdvara och simulator saknas. Det ingår i HIL-protokollet.
 
 ## 33. voltLimit-visning i tunerStudio_v2.2.ini (2026-10-25)
@@ -224,3 +225,35 @@ Temperaturkompensering är inaktiv eftersom det inte finns någon batteritempera
 - Sida 3: skydd och kalibrering utöver givarval och ampZeroAtBoot.
 - Tillstånden SoftStart och PauseTemp, återförsök (retries), overAmpTime, derating och loopTimeUs.
 - **Öppen fråga:** om MaxChargeVolt sätts lika med absorptionsspänningen ger hårdgränsen (V ≥ MaxChargeVolt → av) och CV-målet (= MaxChargeVolt) av/på-pendling. MaxChargeVolt bör ligga en bit över absorb, eller så görs gränsen strikt (>).
+
+## 35. Indikator för avvisad B under laddning (2026-10-25)
+Uppdrag från Ola 2026-10-25: avvisad B ska synas. Valet av plats gjordes vid implementeringen.
+
+- **Plats:** realtime offset 6, `restrictionBits` (U16), **bit 8** (`TsLayout::RestrBurnRejected` = 0x0100). Enligt SPEC_tabeller används bara b0–b7, så b8–b15 är lediga.
+- **Sätts** i `EepromStore::burn()` när B avvisas för att `chargingActive` är sann (`BurnRejectedCharging`). Getter: `EepromStore::burnRejectedCharging()`.
+- **Nollas:**
+  - när en senare B kommer förbi villkoren, alltså vid `BurnOk` eller `BurnErrorVerify` (då tar `eepromWarnBits` b6 BurnFailed över),
+  - och vid omstart (flaggan ligger bara i RAM).
+- **Nollas inte** när laddningen tar slut. Ändringarna i RAM är fortfarande osparade, så indikatorn fungerar som en påminnelse om att trycka B igen. Den blockerar inte start.
+- `BurnRejectedNoGuard` och `BurnErrorNoBackend` lämnar flaggan orörd. NoBackend har egna varningsbitar (b6/b7), och NoGuard betyder att guard saknas, vilket är ett konfigurationsfel och inte en avvisning på grund av laddning.
+- main.cpp lägger in biten efter `AutoParams::writeRealtime()` med `tsRtSetBurnRejected()`, som bara rör b8. Laddaren skriver b0–b7 som förut.
+- tunerStudio_v2.2.ini har en ny gul indikator `{ restrictionBits & 256 }`, och `check_ini_layout.py` kontrollerar att masken stämmer med tsLayout.hpp.
+- **Oförändrat:** layouten i nr 21 (`eepromWarnBits` offset 114, b0–b7), `ochBlockSize` 115 och alla offset.
+- **Bortvalda platser:**
+
+  | Plats | Skäl |
+  |---|---|
+  | `eepromWarnBits` | Alla 8 bitar är upptagna (nr 21). |
+  | `errorBits` | Start kräver errorBits = 0, så biten skulle blockera laddning. Den skulle dessutom tolkas som laddarfel och kvitteras med E4. |
+  | `pageRefreshReq` | Bitarna är knutna till TunerStudios triggeredPageRefresh per sida. |
+  | `statusBits` | b0–b7 är upptagna. |
+- Inte verifierat i TunerStudio (HIL 5.1).
+
+## 36. Egen felbit för bulkAhPct (2026-10-25)
+- När bulkAhPct överskrids i steg 1 sätts **errorBits b12** (`TsLayout::ErrBulkAh` = 0x1000) i stället för ErrMaxTime. Enligt SPEC används b0–b11, så b12 är ledig.
+- Biten beter sig som övriga fel: den låses, laddaren går till Error-läge och E4 kvitterar.
+- `ErrMaxTime` gäller nu bara prechargeMaxTime, bulkMaxTime och totalMaxTime.
+- **Bitexakthet:** auto_params_v2.2.py definierar bara autoWarnBits och inga errorBits. Python-förlagan delar alltså ingen bit, och golden-testet påverkas inte (test_autoparams oförändrat).
+- tunerStudio_v2.2.ini har en ny röd indikator `{ errorBits & 4096 }`. Mätaren errorBitsGauge har max 8191.
+- Inte verifierat i TunerStudio.
+

@@ -108,6 +108,13 @@ public:
 
     uint8_t warnBits() const { return warn_; }
 
+    /* true = senaste B avvisades for att laddning pagick (BurnRejectedCharging),
+     * dvs. andringarna i RAM ar inte sparade. Nollas nar en senare burn kommer
+     * forbi villkoren (BurnOk eller BurnErrorVerify; vid verifieringsfel tar
+     * WarnBurnFailed over) och vid omstart. Paverkar inte warnBits() (layout
+     * nr 21 ororda). Visas som restrictionBits b8 (BESLUT nr 35). */
+    bool burnRejectedCharging() const { return burnRejected_; }
+
     /* Sidans RAM-data, 0 om index ar utanfor 0..4. */
     uint8_t*       page(uint8_t index);
     const uint8_t* page(uint8_t index) const;
@@ -137,6 +144,7 @@ private:
     BurnGuard guard_;
     uint8_t data_[EepromLayout::PagesTotalSize];
     uint8_t warn_;
+    bool burnRejected_;
 };
 
 #endif /* EEPROM_STORE_HPP_ */
