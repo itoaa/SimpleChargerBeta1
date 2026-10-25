@@ -62,7 +62,7 @@ enum
     SEndVoltMin = 8U, SEndAmpMax = 10U, SEndAmpMin = 12U, SMaxTime = 14U,
     SMinTime = 16U, STempMin = 18U, SEndAhPct = 19U
 };
-const int32_t AmpMaxCa = 3000;
+const int32_t AmpMaxCa = 1500;   /* BESLUT nr 42: alla stromfalt 0..15 A */
 const int32_t VoltMaxCv = 6000;
 const int32_t TimeMaxMin = 6000;
 const int32_t MinTimeMaxS = 65535;

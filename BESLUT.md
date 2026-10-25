@@ -392,3 +392,35 @@ Förslag 2 i docs/forslag-2-3-4-6.md (alternativ A), godkänt av Ola 2026-10-25 
 Ola bekräftade 2026-10-25 12:28 (via Max) att E8 ska kopiera de **effektiva** värdena **med** manuella override-värden, alltså `man_X` där `ovr_X` = Manuell, begränsade av hårdvarutaken. Det är så nr 40 är implementerat (`AutoParams::compute(page5, in, r)` utan ignoreOverrides).
 - Kodskissen i docs/forslag-2-3-4-6.md är rättad så att den stämmer med implementationen.
 - Ingen kodändring. Frågan är struken ur PR-beskrivningen.
+
+## 42. Alla strömfält 0–15 A, E8-klampning 1500 cA (2026-10-25)
+Olas beslut 2026-10-25 (punkt 2, via Max): alla strömfält begränsas till 0–15 A. Skälet är att hårdvarutaket är 15 A (MaxChargeAmp max 15 A, `AutoParams` begränsar alla effektiva strömmar till 15 A). Ini-fält som tillät 30 A gav värden som laddaren aldrig kan använda, och mätare som varnade först över taket. Underlag: JAMFORELSE_orig_vs_v2.2.md avsnitt 3.4 och D5. Granskas av CISO.
+
+**Firmware** (`shared/pageCommands.cpp`):
+- `AmpMaxCa` 3000 → **1500** cA. Gäller E8:s klampning av s1–s4 `current`, `endAmpMax` och `endAmpMin`.
+- Inga andra gränser i firmware ändras. Spänningsklampningen i E8 är kvar på 6000 cV (60 V), se öppen fråga nedan.
+
+**tunerStudio_v2.2.ini** (via tools/make_ini22.py, bara övre gräns `hi` ändras; typ, offset, skala och layout är oförändrade):
+
+| Fält | Före | Efter |
+|---|---|---|
+| s1–s4 `_current`, `_endAmpMax`, `_endAmpMin` (12 fält, sida 2) | 0..30 A | 0..15 A |
+| `man_bulkAmp`, `man_tailAmp`, `man_floatAmp`, `man_prechargeAmp` (sida 5) | 0..30 A | 0..15 A |
+| `ampTimeLimit` (sida 4, tabell, inte aktiv) | 0..30 A | 0..15 A |
+| `MaxInputAmp` (sida 1, inte aktiv, nr 34) | 0..30 A | 0..15 A |
+| Oförändrade (redan 0..15): `ChargeAmp`, `MaxChargeAmp`, `autoAmpCap` | 0..15 A | 0..15 A |
+| `tailAmpFloor` | 0..5 A | 0..5 A |
+
+Mätare: `outAmpGauge`, `ampSetGauge`, `inAmpGauge` 0..30 → 0..20 A, varning 14 A, fara 15 A. Effektiva/PC-strömmätare och `ampTimeCurve` y-axel 0..30 → 0..15 A.
+
+**Påverkan:**
+- `AutoParams` och golden (44 137 kontroller) är oförändrade. De effektiva strömmarna är redan begränsade till 1500 cA, så klampningen i E8 ändrar bara utfallet för syntetiska värden över 15 A.
+- Ingen ändring av EEPROM-layout, tsLayout eller standardvärden. Alla standardvärden ligger inom 0..15 A (störst: s1/s2_current och autoAmpCap 15,00 A).
+- Ett värde över 15 A som redan finns i EEPROM (skrivet med äldre ini) ändras inte av firmware. TS visar det som utanför intervallet [U].
+- `MaxInputAmp` räknas som strömfält och har fått 0..15 A. Fältet används inte av firmware (nr 34).
+- Sensorernas mätområden i formeln `pa_sensMax` (5/20/30 A) är givarvärden och inte fältgränser. De är oförändrade.
+
+**Tester:** `testE8Clamp` och `testE8Matrix` i test_pagecmd ändrade 3000 → 1500, och gränsvärdena 1499/1500/1501 cA är tillagda. Mutationskontroll: `AmpMaxCa` = 3000 och = 1501 fälls båda av testE8Clamp (3 fel). Matrisen fäller dem inte, eftersom AutoParams redan begränsar till 15 A.
+
+**Öppen fråga:** utspänningsfälten i ini har nu 0..55 V (nr 43), men E8 klampar spänning till 6000 cV. Ett effektivt värde över 55 V (t.ex. 48 V bly, absorption 58,80 V) skrivs därför utanför ini-intervallet. Ändras inte utan Olas beslut.
+

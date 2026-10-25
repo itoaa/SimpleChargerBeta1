@@ -164,12 +164,12 @@ static bool stepIs(const uint8_t* p, const StepExp& e)
     bool ok = true;
     ok = ok && ((p[0] & 3U) == e.method) && (((p[0] >> 2) & 3U) == e.onEnd) && ((p[0] & 0xF0U) == 0U);
     ok = ok && ((int8_t)p[1] == clampI(e.tempMax, -40, 80));
-    ok = ok && (rd16(p + 2) == clampI(e.current, 0, 3000));
+    ok = ok && (rd16(p + 2) == clampI(e.current, 0, 1500));
     ok = ok && (rd16(p + 4) == clampI(e.volt, 0, 6000));
     ok = ok && (rd16(p + 6) == clampI(e.endVoltMax, 0, 6000));
     ok = ok && (rd16(p + 8) == clampI(e.endVoltMin, 0, 6000));
-    ok = ok && (rd16(p + 10) == clampI(e.endAmpMax, 0, 3000));
-    ok = ok && (rd16(p + 12) == clampI(e.endAmpMin, 0, 3000));
+    ok = ok && (rd16(p + 10) == clampI(e.endAmpMax, 0, 1500));
+    ok = ok && (rd16(p + 12) == clampI(e.endAmpMin, 0, 1500));
     ok = ok && (rd16(p + 14) == clampI(e.maxTime, 0, 6000));
     ok = ok && (rd16(p + 16) == clampI(e.minTime, 0, 65535));
     ok = ok && ((int8_t)p[18] == clampI(e.tempMin, -40, 60));
@@ -303,8 +303,8 @@ static void testE8Clamp()
     const uint8_t* s3 = s2 + P2StepSize;
     const uint8_t* s4 = s3 + P2StepSize;
     CHECK(s1[19] == 200U);
-    CHECK(rd16(s1 + 2) == 3000U && rd16(s1 + 4) == 6000U && rd16(s1 + 6) == 6000U && rd16(s1 + 14) == 6000U);
-    CHECK(rd16(s2 + 12) == 3000U && rd16(s2 + 16) == 65535U);
+    CHECK(rd16(s1 + 2) == 1500U && rd16(s1 + 4) == 6000U && rd16(s1 + 6) == 6000U && rd16(s1 + 14) == 6000U);
+    CHECK(rd16(s2 + 12) == 1500U && rd16(s2 + 16) == 65535U);
     CHECK(rd16(s3 + 2) == 0U && rd16(s3 + 4) == 0U);
     CHECK(rd16(s4 + 8) == 6000U);
     CHECK((int8_t)s1[1] == 80 && (int8_t)s1[18] == 60);
@@ -313,6 +313,13 @@ static void testE8Clamp()
     r.eff[AutoParams::ChargeTempMin] = -50;
     PageCommands::copyEffectiveToSteps(r, p2);
     CHECK((int8_t)s4[1] == -40 && (int8_t)s4[18] == -40);
+    /* BESLUT nr 42: strom 0..1500 cA (15 A), gransvarden */
+    r.eff[AutoParams::BulkAmp] = 1501;
+    r.eff[AutoParams::TailAmp] = 1500;
+    r.eff[AutoParams::FloatAmp] = 1499;
+    PageCommands::copyEffectiveToSteps(r, p2);
+    CHECK(rd16(s1 + 2) == 1500U && rd16(s2 + 2) == 1500U);
+    CHECK(rd16(s2 + 12) == 1500U && rd16(s3 + 2) == 1499U);
 }
 
 /* 5: AH_MISSING / NOMV_INVALID -> ingen andring, 0 */
@@ -410,8 +417,8 @@ static void testE8Matrix()
             const uint8_t* p = stepP(s, n);
             ok = ok && ((p[0] & 0xF0U) == 0U) && (((p[0] >> 2) & 3U) <= 2U);
             ok = ok && ((int8_t)p[1] >= -40) && ((int8_t)p[1] <= 80);
-            ok = ok && (rd16(p + 2) <= 3000U) && (rd16(p + 4) <= 6000U) && (rd16(p + 6) <= 6000U);
-            ok = ok && (rd16(p + 8) <= 6000U) && (rd16(p + 10) <= 3000U) && (rd16(p + 12) <= 3000U);
+            ok = ok && (rd16(p + 2) <= 1500U) && (rd16(p + 4) <= 6000U) && (rd16(p + 6) <= 6000U);
+            ok = ok && (rd16(p + 8) <= 6000U) && (rd16(p + 10) <= 1500U) && (rd16(p + 12) <= 1500U);
             ok = ok && (rd16(p + 14) <= 6000U);
             ok = ok && ((int8_t)p[18] >= -40) && ((int8_t)p[18] <= 60) && (p[19] <= 200U);
         }
