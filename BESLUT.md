@@ -55,3 +55,90 @@ E\x07–E\x09 ändrar bara RAM. Användaren bränner med B.
 ## 19. Lysdioder direkt från MCU-pinnar – undantag (2026-10-25)
 - PD3–PD5 driver lysdioderna direkt från MCU-pinnarna. Det är ett uttryckligt undantag från regeln "inget drivs direkt från en MCU-pinne".
 - PB1 (PWM) går via en gate-drivare.
+
+## 20. EEPROM-basadress 16 (2026-10-25)
+- Layouten börjar på adress 16 och slutar på 323 (308 B).
+- Adress 0–15 är reserverade och skrivs aldrig av modulen.
+- Adress 0 undviks eftersom den lätt korrumperas vid brownout [U, erfarenhet från AVR-communityt, inte databladet].
+- Se `docs/eeprom-layout.md`.
+
+## 21. Statusbyte `eepromWarnBits` på realtidsoffset 114 (2026-10-25)
+Gäller beslut 8. Byten är en U08 på offset 114, och realtidsblocket växer från 114 till 115 B. Ini och protokoll ändras när v2.2 kopplas in.
+
+| Bit | Betydelse |
+|---|---|
+| b0 | HeaderInvalid: alla sidor har standardvärden |
+| b1–b5 | CRC-fel på sida 1–5: sidan har standardvärden |
+| b6 | BurnFailed |
+| b7 | NoBackend |
+
+## 22. Standardvärden för tabeller utan defaultValue (2026-10-25)
+Värdena i `test/table_proposals.py` och `shared/eepromDefaults.cpp` är godkända:
+
+| Tabell | Värden |
+|---|---|
+| mosfetTempADCTable (ADC/4) | 8, 12, 16, 21, 28, 38, 51, 67, 88, 128, 197, 233 |
+| mosfetTempTable (°C) | 125, 110, 100, 90, 80, 70, 60, 50, 40, 25, 0, −20 |
+| batNtcADC | 204, 270, 310, 355, 404, 456, 512, 570, 685, 789, 874, 935 |
+| batNtcTemp (°C) | 60, 50, 45, 40, 35, 30, 25, 20, 10, 0, −10, −20 |
+| derateTempBins (°C) | 70–120 i steg om 10 |
+| deratePct (%) | 100, 80, 60, 40, 20, 0 |
+| ampTimeBins (s) | 0, 60, 300, 900, 3600 |
+| ampTimeLimit (0,01 A) | 1500 × 5 (= hårdvarutaket 15 A) |
+
+**NTC-tabellerna är PLATSHÅLLARE.** Det gäller batNtcADC/batNtcTemp och mosfetTempADCTable/mosfetTempTable. Kortet saknar NTC, så värdena bygger på en antagen NTC på 10 kΩ/B3950 med 10 kΩ pull-up och är inte uppmätta. De ska bytas ut när en givare väljs (etapp 6, beslut 18).
+
+## 23. BOD 4,3 V – efuse 0xFC (2026-10-25)
+- **Nivå:** BODLEVEL[2:0] = 100, alltså 4,3 V typiskt och 4,1–4,5 V (databladet DS40002061B, tabell 29-12).
+- **Efuse-värdet:** BODLEVEL är bit 2:0 i efuse. Bit 7:3 används inte och är 1 som standard (tabell 28-6). Ett programmerat bit läses som 0 (avsnitt 28.2). Alltså är 0xFC = 1111 1100 = BODLEVEL 100.
+- **Varför:** vid 16 MHz garanterar databladet korrekt drift först från ungefär 3,8 V (uträknat ur avsnitt 29.3). Med BOD 4,3 V hålls MCU:n i reset innan den hamnar i det osäkra området.
+- **Ändras inte:** lfuse och hfuse. Arduino Uno/Optiboot använder lfuse 0xFF och hfuse 0xDE (512 B boot) enligt `boards.txt`.
+- **Vem gör det:** Ola sätter säkringen själv med ISP-programmerare. Optiboot kan inte skriva säkringar.
+
+Läs först av alla tre säkringarna och notera värdena:
+```
+avrdude -c <PROGRAMMER> -P <PORT> -p m328p -U lfuse:r:-:h -U hfuse:r:-:h -U efuse:r:-:h
+```
+Om lfuse = 0xFF och hfuse = 0xDE, sätt bara efuse:
+```
+avrdude -c <PROGRAMMER> -P <PORT> -p m328p -U efuse:w:0xFC:m
+```
+Läs sedan av igen och kontrollera:
+```
+avrdude -c <PROGRAMMER> -P <PORT> -p m328p -U efuse:r:-:h
+```
+- `<PROGRAMMER>` och `<PORT>` är platshållare, till exempel `usbasp` (där `-P` ofta inte behövs) eller `avrisp -P /dev/ttyACM0 -b 19200`.
+- Använd inte `-e` (chip erase). Med hfuse 0xDE är EESAVE av, så en chip erase raderar EEPROM.
+- Om lfuse/hfuse avviker från 0xFF/0xDE: ändra ingenting, stanna och utred.
+- **Läsvärdet:** avrdude.conf (avrdudes main-gren, part m328) har `bitmask = 0x07` för efuse och skriver bara bit 2:0. Därför kan en avläsning visa 0xFC eller 0x04 beroende på avrdude-version och programmerare [U, inte verifierat]. Det som räknas är bit 2:0 = 100.
+- **Inte verifierat:**
+  - MCU:ns matningsspänning på kortet. Den finns inte i repot. BOD 4,3 V kräver att VCC hela tiden ligger över 4,5 V (max VBOT) med rippel och lastsprång. Annars går MCU:n i reset.
+  - Lock-bitarna. Uno använder 0x0F enligt `boards.txt`. LB1 är då inte programmerad, så säkringarna är inte låsta (avsnitt 28.2). Det är inte avläst på något kort.
+
+**BurnGuard kompletterar BOD men ersätter den inte.**
+- BurnGuard (beslut 7) stänger av utgången och nekar B under laddning.
+- BOD är det enda som hindrar CPU:n från att köra, och skriva EEPROM, vid för låg spänning.
+- CRC och huvudet-sist hindrar bara att trasiga data används.
+
+## FÖRSLAG (inte godkänt av Ola): standardvärde för MaxChargeVolt
+**Förslag:** behåll **0 = utgång av** som standardvärde. Det är SPEC_v2.2.md öppen fråga 7.
+
+**Skäl:**
+1. Säkerheten först. En laddare med ogiltigt EEPROM ska inte ladda. Standardvärden laddas när huvudet är ogiltigt, vid CRC-fel på sida 1, och efter uppgradering eftersom ingen migrering görs (beslut 14). Med 0 startar laddaren då inte. Med ett tal laddar den på gissade gränser.
+2. Det stämmer med beslut 10 och dagens beteende. README säger att PWM står på duty 0 tills TunerStudio har en spänningsgräns och en strömgräns (`main.cpp:68`).
+3. Ett fast tal fungerar inte för alla batterityper. Autoläget räknar redan voltLimit per typ: 2,50 V/cell = 15,00 V för 12 V bly och 14,60 V för LiFePO4.
+
+**Alternativen:**
+
+| Alternativ | Följd |
+|---|---|
+| 14,40 V | begränsar standardbatteriet (60 Ah våt start), kalcium/EFB och våt djupcykel med absorption 14,70 V till 14,40 V (VOLT_CLAMPED) och underladdar dem |
+| 14,70 V | tar bort temperaturkompensationen uppåt vid kyla (spec: 15,00 V vid 0 °C) |
+| 15,00 V | samma som autoläget redan ger för 12 V bly, så taket tillför inget där. Det gör att laddaren laddar okonfigurerad. För 24 V hindrar det laddning |
+| tak = absorptionsspänningen ur autoläget | går inte som fast standardvärde, eftersom absorption beror på typ och temperatur. Det blir dubbelt mot autolägets voltLimit och tar bort temperaturkompensationen uppåt |
+
+Om förslaget godkänns behövs ingen ändring av standardvärden, golden eller tester. MaxChargeVolt är redan 0, och `test_eeprom.cpp` kontrollerar det.
+
+**Kvar att tänka på:**
+- I v2.2-ini (rad 662) och `auto_params_v2.2.py` (rad 164) betyder MaxChargeVolt 0 "inget extra tak" i beräkningen av voltLimit. TS visar då voltLimit 15,00 V trots att utgången är av.
+- Det är inte en säkerhetsrisk, eftersom firmware stoppar utgången först. Men visningen kan behöva en varning när v2.2 kopplas in. Ini ändras inte nu.
