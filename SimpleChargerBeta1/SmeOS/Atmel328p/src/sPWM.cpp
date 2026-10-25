@@ -161,7 +161,7 @@ bool	sPWM::setPrescaler(int prescaler)
 }
 void	sPWM::inverse(bool inverse)
 {
-
+	(void)inverse;								// Ej implementerad ännu; parametern används inte (tystar -Wunused-parameter).
 }
 int		sPWM::getFrequency()
 {
