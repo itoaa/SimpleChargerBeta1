@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""FORSLAG till standardvarden for tabeller som saknar defaultValue i
+"""Standardvarden (godkanda, BESLUT.md nr 22) for tabeller som saknar defaultValue i
 SmedbyCharger_v2.2.ini (sida 1 MOSFET-kurva och alla sex tabeller pa sida 4).
 
-Alla varden har ar FORSLAG [U] - inget ar verifierat mot hardvara. Kortet
+Inget ar verifierat mot hardvara [U]; NTC-kurvorna ar PLATSHALLARE. Kortet
 har i dag ingen NTC (TemperaturePin PD7 ar digital, DS18B20 ej lankad), sa
 NTC-kurvorna ar platshallare som gor tabellerna monotona och anvandbara om
 en NTC monteras. Ini-filen andras inte; gen_defaults_golden.py lagger in

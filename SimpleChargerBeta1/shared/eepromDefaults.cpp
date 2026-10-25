@@ -5,7 +5,8 @@
  * Kalla: SPEC_tabeller_v2.2.md och defaultValue i SmedbyCharger_v2.2.ini.
  * Skalara falt utan angivet standardvarde = 0 (enligt specen).
  * Tabellerna pa sida 1 (MOSFET-kurva) och sida 4 saknar defaultValue i ini;
- * har star FORSLAG [U] (beraknade i test/table_proposals.py, se
+ * vardena har ar godkanda (BESLUT.md nr 22); NTC-kurvorna ar PLATSHALLARE
+ * (kortet saknar NTC) [U] (beraknade i test/table_proposals.py, se
  * docs/eeprom-layout.md). Testet test/test_eeprom.cpp jamfor byte for byte
  * mot golden_defaults.inc, som genereras ur ini-filen + table_proposals.py.
  */
@@ -28,9 +29,9 @@ const uint8_t eepromDefaults[EepromLayout::PagesTotalSize] SC_PROGMEM =
     0U,             /* 11 MinPWM */
     0U,             /* 12 MaxTemp (0 = av) */
     0U,             /* 13 accelerationDelay (x10 ms) */
-    /* 14 mosfetTempADCTable[12], ADC/4. FORSLAG [U]: NTC 10k/B3950, 10k pull-up */
+    /* 14 mosfetTempADCTable[12], ADC/4. PLATSHALLARE [U]: NTC 10k/B3950, 10k pull-up */
     8U, 12U, 16U, 21U, 28U, 38U, 51U, 67U, 88U, 128U, 197U, 233U,
-    /* 26 mosfetTempTable[12], C. FORSLAG [U] */
+    /* 26 mosfetTempTable[12], C. PLATSHALLARE [U] */
     S08(125), S08(110), S08(100), S08(90), S08(80), S08(70),
     S08(60), S08(50), S08(40), S08(25), S08(0), S08(-20),
 
@@ -73,11 +74,11 @@ const uint8_t eepromDefaults[EepromLayout::PagesTotalSize] SC_PROGMEM =
     U16LE(10000), U16LE(0),   /* 30 calInAmp */
     U16LE(10000), U16LE(0),   /* 34 calDriver */
 
-    /* ---- Sida 4 (68 B): inga standardvarden i spec/ini -> FORSLAG [U] ---- */
-    /*  0 batNtcADC U16[12], 10 bit. NTC 10k/B3950, 10k pull-up [U] */
+    /* ---- Sida 4 (68 B): inga standardvarden i spec/ini -> BESLUT.md nr 22 ---- */
+    /*  0 batNtcADC U16[12], 10 bit. PLATSHALLARE: NTC 10k/B3950, 10k pull-up [U] */
     U16LE(204), U16LE(270), U16LE(310), U16LE(355), U16LE(404), U16LE(456),
     U16LE(512), U16LE(570), U16LE(685), U16LE(789), U16LE(874), U16LE(935),
-    /* 24 batNtcTemp S08[12], C */
+    /* 24 batNtcTemp S08[12], C. PLATSHALLARE [U] */
     S08(60), S08(50), S08(45), S08(40), S08(35), S08(30),
     S08(25), S08(20), S08(10), S08(0), S08(-10), S08(-20),
     /* 36 derateTempBins S08[6], C (start = derateStartTemp 70) */

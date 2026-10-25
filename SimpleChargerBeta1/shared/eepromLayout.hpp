@@ -48,7 +48,7 @@ const uint16_t Page4RamOffset = Page3RamOffset + Page3Size;
 const uint16_t Page5RamOffset = Page4RamOffset + Page4Size;
 
 /* ---- EEPROM-adresser ------------------------------------------------- */
-/* Basadress 16 (forslag, se docs/eeprom-layout.md):
+/* Basadress 16 (BESLUT.md nr 20, se docs/eeprom-layout.md):
  *  - adress 0 undviks: vid brownout under skrivning ar adress 0 den
  *    vanligaste korrumperade cellen (EEAR nollas vid reset) [U: erfarenhet
  *    fran AVR-communityt, inte databladet];

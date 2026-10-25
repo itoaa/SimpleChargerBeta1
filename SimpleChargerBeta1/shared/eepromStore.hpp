@@ -46,7 +46,7 @@ struct BurnGuard
     void* ctx;
 };
 
-/* Realtidsdata: forslag till ny statusbyte for EEPROM-varningarna (BESLUT.md nr 8).
+/* Realtidsdata: ny statusbyte for EEPROM-varningarna (BESLUT.md nr 8 och 21).
  * Laggs efter 114 B-blocket i SPEC_tabeller_v2.2.md (offset 0..113 ar fullt
  * belagda), dvs ochBlockSize 114 -> 115. Bitarna = EepromStore::warnBits().
  * Endast konstanter: protokollet/ini andras inte i denna version. */
