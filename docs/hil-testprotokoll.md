@@ -2,7 +2,7 @@
 
 Status: **ej genomfört.** Allt i v2.2 (etapp 2–5) är bara testat med värdtester på PC (`make -C SimpleChargerBeta1/test test`). Inget är verifierat på hårdvara eller i TunerStudio. Det här protokollet fylls i vid första provningen på bänk.
 
-Firmware: grenen `feature/tunerstudio-v2.2`. Lokalt bygge (avr-gcc 14.2.0): `charger.hex` md5 `51ab51b96ce79729d0aaf7008ae8a826`. CI-bygget (Ubuntus gcc-avr) ger en annan hex. Notera den hex som faktiskt flashas.
+Firmware: grenen `feature/tunerstudio-v2.2`. Lokalt bygge (avr-gcc 14.2.0): `charger.hex` md5 `d16838da89f3485bae8ccc1d3cc72617` (efter BESLUT nr 35/36). CI-bygget (Ubuntus gcc-avr) ger en annan hex. Notera den hex som faktiskt flashas.
 Ini: `SimpleChargerBeta1/tunerStudio_v2.2.ini` (signatur `"MSII s-Charger 2.2  "`, 115 200 baud enligt `Hardware.hpp`, SmedbyCharger11).
 
 ## 0. Säkerhet och förutsättningar (före allt annat)
@@ -24,7 +24,7 @@ Avbryt om 0.2 eller 0.3 inte är uppfyllt.
 | 1.1 | Flasha via Optiboot och starta. Tom eller gammal EEPROM (B-2). | Utgången av (duty 0, PWM-pinne låg). Ingen laddning startar. | |
 | 1.2 | Anslut TS med `tunerStudio_v2.2.ini` | TS accepterar signaturen utan varning om fel firmware. F ger `002`. | |
 | 1.3 | Läs `eepromWarnBits` (realtime 114) | b0 = 1 (huvud ogiltigt, standardvärden) vid tom EEPROM | |
-| 1.4 | Läs `resetCause` (realtime 66) | Noteras. [U] kan vara 0 om Optiboot nollställt MCUSR (BESLUT nr 30). | |
+| 1.4 | Läs `resetCause` (realtime 66) efter strömpåslag | Noteras. Förväntat PORF (0x01) eller BORF (0x04). [U] Kan vara 0 om Optiboot har nollställt MCUSR (BESLUT nr 30). **Se avsnitt 10.1.** | |
 | 1.5 | Läs `pwmFreqNow` | 31 (beräknat värde). Mät frekvensen på PWM-pinnen med oscilloskop när duty > 0 (steg 6): förväntat ca 31,4 kHz. | |
 
 ## 2. Sidbyte och läsning
@@ -57,7 +57,10 @@ Avbryt om 0.2 eller 0.3 inte är uppfyllt.
 
 | # | Steg | Förväntat | Resultat |
 |---|---|---|---|
-| 5.1 | Starta laddning mot dummylast (steg 6.1) och tryck Burn under pågående laddning | B avvisas: EEPROM oförändrad (kontrollera efter omstart), utgången påverkas inte. **Ingen återkoppling i TS** (öppen fråga, BESLUT nr 26). | |
+| 5.1 | Ändra ett värde, starta laddning mot dummylast (steg 6.1) och tryck Burn under pågående laddning | B avvisas. Utgången påverkas inte (oscilloskop). Gul indikator "BURN AVVISAD" tänds (`restrictionBits` b8, BESLUT nr 35). `eepromWarnBits` oförändrad. | |
+| 5.1a | Stoppa laddningen (E2) | Indikatorn lyser kvar, eftersom ändringen fortfarande är osparad. Laddning kan startas igen (biten blockerar inte). | |
+| 5.1b | Tryck Burn i vila | Indikatorn släcks. `eepromWarnBits` = 0. Värdet finns kvar efter omstart. | |
+| 5.1c | Upprepa 5.1, gör sedan omstart (E5 i vila eller strömavbrott) utan B | Indikatorn släckt efter omstart. Ändringen är borta (EEPROM oförändrad). | |
 | 5.2 | E5 och E6 under laddning | Ignoreras (BESLUT nr 25/28) | |
 
 ## 6. E-kommandon E1–E9 (dummylast, inget batteri)
@@ -76,8 +79,10 @@ Inställning: MaxChargeVolt > 0 och lagom låg för dummylasten, chargeMode Enke
 | 6.8 | E8 | Ingen ändring (inte implementerad, BESLUT nr 28) | |
 | 6.9 | E9 (alla → Auto) | ovr-bitarna = 0 och man_* oförändrade | |
 | 6.10 | MaxChargeVolt = 0 | Utgången av och laddning kan inte startas. TS visar voltLimit 0 med röd indikator (BESLUT nr 33). | |
+| 6.11 | Indikatorn "Max Ah i bulk" (`errorBits` b12, BESLUT nr 36) | Finns i TS och är släckt. Felet kräver Auto-laddning med batteri och testas inte här; det är bara värdtestat. | |
+| 6.12 | Känd risk (förslag 4 i `docs/forslag-2-3-4-6.md`): Enkel-läge med dummylast där utspänningen når MaxChargeVolt | Notera om utgången slår av/på (felbit OverVoltOut blinkar, duty hoppar till 0). I värdsimulering pendlar den. Ingen åtgärd är implementerad. | |
 
-## 7. pageRefresh (triggeredPageRefresh)
+## 7. pageRefresh (triggeredPageRefresh) – se även 10.2
 
 | # | Steg | Förväntat | Resultat |
 |---|---|---|---|
@@ -96,6 +101,33 @@ Inställning: MaxChargeVolt > 0 och lagom låg för dummylasten, chargeMode Enke
 ## 9. Batteri (först när 0–8 är godkända)
 
 Inte en del av det här protokollet. Batteri kopplas in först när spänningsgränserna är verifierade mot dummylast (plan avsnitt 6).
+
+## 10. Öppna punkter som bara kan avgöras på bänk (Ola)
+
+Båda är oprövade. Värdtesterna kan inte avgöra dem.
+
+### 10.1 Optiboot och MCUSR (resetCause, realtime 66)
+
+firmware läser `MCUSR & 0x0F` i `.init3` (BESLUT nr 30). [U] Optiboot kan läsa och nollställa MCUSR innan applikationen startar. Då visar resetCause 0 och orsaken går förlorad. Vissa Optiboot-versioner skickar i stället vidare MCUSR i register r2, men det är inte kontrollerat för den version som finns på kortet.
+
+| # | Steg | Förväntat | Resultat |
+|---|---|---|---|
+| 10.1.1 | Notera Optiboot-version (avrdude -v eller källa) | Noteras | |
+| 10.1.2 | resetCause efter strömpåslag | PORF 0x01 (ev. med BORF 0x04) eller 0 = nollställd av Optiboot | |
+| 10.1.3 | resetCause efter E5 (watchdog-omstart) | WDRF 0x08 eller 0 | |
+| 10.1.4 | resetCause efter tryck på reset (extern) | EXTRF 0x02 eller 0 | |
+| 10.1.5 | Om allt ovan ger 0 | Optiboot nollställer MCUSR. Rapportera. Möjlig åtgärd (inte gjord): läs r2 från Optiboot. | |
+
+### 10.2 triggeredPageRefresh (pageRefreshReq, realtime 113)
+
+Firmware håller biten i cirka 1 s (`RefreshHoldMs` 1000) efter E7/E9. Det är okänt om din TunerStudio-version läser om sidan direkt via `[EventTriggers] triggeredPageRefresh` (SPEC_v2.2 avsnitt 3, "ärligt förbehåll").
+
+| # | Steg | Förväntat | Resultat |
+|---|---|---|---|
+| 10.2.1 | Notera TunerStudio-version och utgåva | Noteras | |
+| 10.2.2 | Kör 7.1 och 7.2 | Fälten uppdateras utan att dialogen stängs | |
+| 10.2.3 | Logga `pageRefreshReq` i TS-loggern under E7 | Bit 0x10 är 1 i ungefär 1 s och sedan 0, och den sitter inte kvar | |
+| 10.2.4 | Om ingen omläsning sker | Reserv: stäng och öppna dialogen, eller Ctrl+R. Tryck **inte** Burn innan TS visar de nya värdena, annars skrivs de gamla tillbaka. | |
 
 ## Ej testbart i v2.2
 
