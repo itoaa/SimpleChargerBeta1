@@ -7,3 +7,4 @@
 *.hex
 !charger.elf
 !charger.hex
+/test/build/
