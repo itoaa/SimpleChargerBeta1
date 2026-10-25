@@ -135,3 +135,92 @@ Ola har bekräftat det tidigare förslaget: standardvärdet för MaxChargeVolt �
 - **Tak = absorptionsspänningen** beror på batterityp och temperatur och kan därför inte vara ett fast värde.
 
 **TS-visningen ses över vid inkopplingen.** I v2.2-ini (rad cirka 662, `pa_voltLimit`) och `auto_params_v2.2.py` (rad cirka 164) betyder MaxChargeVolt 0 "inget extra tak". TS visar då voltLimit 15,00 V fast utgången är av. Det hanteras i v2.2-implementationen.
+
+---
+
+Beslut 25–34 nedan är **implementationsval i etapp 2–5 och 7 (2026-10-25)**, gjorda inom ramen för beslut 1–24 och Olas uppdrag 2026-10-25 10:44. De är inte separat bekräftade av Ola. Ett val som Ola vill ändra ersätts med ett nytt beslut. Inget av detta är verifierat på hårdvara eller i TunerStudio.
+
+## 25. Definition av chargingActive (2026-10-25)
+`chargingActive` = laddartillståndet är något av {Timer, SoftStart, Charging, PauseTemp} **eller** duty > 0 **eller** diagMode == 1 (`Charger::chargingActive()`).
+- Används av BurnGuard (beslut 7): B avvisas när den är sann.
+- Används av E5 (omstart) och E6 (nollställ strömgivare): de ignoreras när den är sann.
+- SoftStart och PauseTemp finns som tillstånd men nås inte i denna version (se nr 34).
+
+## 26. B i main.cpp (2026-10-25)
+- B anropar `EepromStore::burn()` via BurnGuard. Utgången stängs av (OCR 0) före skrivningen och sätts tillbaka till laddarens duty efter. Eftersom B bara tillåts när `chargingActive` är falsk är den duty i praktiken 0.
+- Resultatet syns bara i realtime 114 `eepromWarnBits`. **Öppen fråga:** en avvisad B (laddning pågår) ger ingen återkoppling i TunerStudio, och varningsbitarna ändras inte.
+- Kopieringsknapparna E7–E9 ändrar bara RAM-kopian och bränner aldrig.
+
+## 27. Startsemantik (2026-10-25)
+- Laddaren startar **aldrig automatiskt vid uppstart**. Efter boot är duty 0 och tillståndet Waiting.
+- Laddning startar på E1, eller vid startMode Auto/Timer när ett batteri ansluts efter boot (frånvarande → närvarande).
+- Start kräver: MaxChargeVolt > 0 (beslut 24), MaxPWM > 0 och MinPWM ≤ MaxPWM, chargeMode Auto eller Enkel, inga fel, inte Error-läge. I Auto krävs dessutom ett batteri och att autoWarnBits saknar AH_MISSING och NOMV_INVALID.
+- E1 gäller bara det regulatorvarv där det tas emot (`startReq` nollställs i varje `update()`). Ett E1 som kommer i Error-läge lagras alltså inte och startar inte laddning efter E4.
+- diagMode tvingas till Normal vid uppstart (SPEC "sparas inte").
+
+## 28. E-kommandon (2026-10-25)
+| Kod | Funktion i firmware |
+|---|---|
+| E1 | Start (gäller bara det varv det tas emot, se nr 27) |
+| E2 | Stopp → Waiting. Ingen autostart förrän batteriet har kopplats ur och in igen. |
+| E3 | Nollställ visade räknare (Ah, Wh, laddtid). Skyddstiden totalMaxTime nollställs inte. |
+| E4 | Kvittera fel. Error → Waiting. |
+| E5 | Omstart via watchdog (ca 15 ms) efter att utgången stängts av. Ignoreras när `chargingActive` är sann. |
+| E6 | Nollställ strömgivaren. Ignoreras när `chargingActive` är sann. |
+| E7 | Autovärden → `man_*` på sida 5 (`ovr`-bitarna rörs inte), pageRefreshReq-bit 0x10 |
+| E8 | **Inte implementerad.** Mappningen effektiva värden → stegtabell s1–s4 på sida 2 är inte specificerad. Knappen i ini gör ingenting. |
+| E9 | Alla parametrar → Auto: `ovr`-bitarna (sida 5, byte 8–10) nollas. `man_*` lämnas. pageRefreshReq-bit 0x10. |
+
+- Efter E7–E9 och efter varje sidskrivning räknas autoparametrarna om. pageRefreshReq (realtime 113) hålls i cirka 1 s. Det är otestat i TunerStudio.
+- Rättelse: commit 19c8c4b beskriver E9 som "nollställ räknare" i rubriken. Rätt är "alla parametrar → Auto" enligt ovan. Koden och testerna följer tabellen.
+
+## 29. Strömgivare och nollställning (2026-10-25)
+- Sida 3 bit 4–5 (currentSensor) läses **bara vid uppstart**. En ändring kräver omstart (E5 eller strömavbrott). Avvikelse: SPEC anger inte när den ska gälla.
+- 0 = 5 A, 1 = 20 A och 2 = 30 A motsvarar `Current`-typ 1–3. 3 = shunt stöds inte av `Current`, så då används `Current_Measure_type` i `Hardware.hpp`.
+- ampZeroAtBoot (bit 6): nollställning efter cirka 200 ms med utgången av, bara om biten är satt.
+- **Öppen fråga:** `Current::readCurrent()` returnerar `int` (16 bit) i mA (`scaleAcs712Ma`: `(int)(amps * 1000.0)`). Över 32,767 A är omvandlingen double → int odefinierad. Typ 3 (66 mV/A) kan vid full ADC-skala ge ungefär ±37,9 A [U] (ref 5 000 mV, offset 2 500 mV antaget), så det kan inträffa vid överström eller fel. main räknar om till cA i 32 bit och klampar till ±32 767 cA, men det hjälper inte mot överslag i drivrutinen.
+
+## 30. Realtidsfält som inte mäts (2026-10-25)
+| Fält | Värde | Skäl |
+|---|---|---|
+| Temperaturer och deras ADC | 0 = ej tillgänglig | Ingen givare utan etapp 6 (pinnar saknas, plan fråga 9) |
+| inAmp | 0 | Ingen ingångsströmgivare |
+| loopTimeUs | 0 | Inte implementerat |
+| pwmFreqNow | 31 (kHz) | **Beräknat** från Timer1-registren (WGM10, CS10: 16 MHz / 510 ≈ 31,4 kHz), inte mätt |
+| resetCause | MCUSR & 0x0F | Läses i `.init3` innan något annat körs. [U] Optiboot kan redan ha nollställt MCUSR, och då blir värdet 0. Inte verifierat. |
+
+Temperaturkompensering är inaktiv eftersom det inte finns någon batteritemperaturgivare.
+
+## 31. Stegnumrering i Auto (2026-10-25)
+| Steg | Namn | Slut |
+|---|---|---|
+| 0 | Förladdning (CC prechargeAmp) | V > prechargeVolt; prechargeMaxTime → fel MaxTime |
+| 1 | Bulk (CC bulkAmp) | V ≥ absorb; bulkMaxTime eller bulkAhPct → fel MaxTime |
+| 2 | Absorption (CV absorb) | I < tail i absorbMinTime s, eller absorbMaxTime |
+| 3 | Float (CV float) | floatMaxTime (0 = obegränsat) |
+| 4 | Övervaka (utgång av, tillstånd Done) | Omstart till steg 1 när V < restartVolt (12,5 V-standard) och omstart är på |
+
+- Tidsgränserna är i minuter och totalMaxTime gäller hela laddningen. Timern nollställs vid omstart från Övervaka.
+- I Enkel-läge är steget alltid 0.
+- **Öppen fråga:** när bulkAhPct överskrids används felbiten MaxTime, eftersom någon egen bit saknas.
+
+## 32. Resursmätning (2026-10-25)
+- `tools/check_size.sh` läser sektionerna (`avr-size -A`). `-B`-formatet i nyare binutils redovisar `.data` under text, och då underskattades RAM: master rapporterades som 90 B mot verkliga 182 B.
+- avr-gcc 14.2.0 (lokalt): flash 7 238 → 18 296 B (gräns 28 672 B), statiskt RAM 182 → 866 B (gräns 1 229 B). Båda är **mätta** med avr-size.
+- CI (Ubuntus gcc-avr): flash 18 440 B, statiskt RAM 864 B.
+- Stack: **uppskattad** till 368 B [U] med `tools/stack_estimate.py`. Värsta kedjan är main → pollSerial → TunerStudio → onCommand → PageCommands::apply → AutoParams::compute, plus värsta ISR och 32 B schablon för biblioteket. Det lämnar cirka 800 B marginal av 2 048 − 866 = 1 182 B.
+- Ingen stack-painting är gjord, eftersom hårdvara och simulator saknas. Det ingår i HIL-protokollet.
+
+## 33. voltLimit-visning i tunerStudio_v2.2.ini (2026-10-25)
+- I SmedbyCharger_v2.2.ini betyder MaxChargeVolt 0 "inget extra tak", och TunerStudio visade då voltLimit 15,00 V trots att utgången är av (beslut 24).
+- Rättelse i den nya `tunerStudio_v2.2.ini`: kanalerna `voltLimitShown`/`pcVoltLimitShown` och mätaren `voltLimitNowG` visar 0 när MaxChargeVolt = 0, och en röd indikator visar att utgången är av. `eff_voltLimit` och `pa_voltLimit` är oförändrade, så `pa_diffCount` jämför som förut.
+- Ini-filen genereras med `tools/make_ini22.py` från SmedbyCharger_v2.2.ini (Drive, md5 55ba5c2a…) och valideras i `make test` (`check_ini_layout.py` och `ref/validate_ini_v2.2.py`).
+- Compat-filerna (`tunerStudio.ini`, `SmedbyCharger_compat.ini`) är oförändrade.
+
+## 34. Inte implementerat i v2.2-etapperna (2026-10-25)
+- Etapp 6 (givare: DS18B20, NTC, ingångsström). Uppskjuten enligt uppdraget.
+- chargeMode 1 (manuella stegtabeller s1–s4) och E8.
+- diagMode 1 (utgångsstyrning från TunerStudio). Diag-läget stänger bara av utgången.
+- Sida 3: skydd och kalibrering utöver givarval och ampZeroAtBoot.
+- Tillstånden SoftStart och PauseTemp, återförsök (retries), overAmpTime, derating och loopTimeUs.
+- **Öppen fråga:** om MaxChargeVolt sätts lika med absorptionsspänningen ger hårdgränsen (V ≥ MaxChargeVolt → av) och CV-målet (= MaxChargeVolt) av/på-pendling. MaxChargeVolt bör ligga en bit över absorb, eller så görs gränsen strikt (>).

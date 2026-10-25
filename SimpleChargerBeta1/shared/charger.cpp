@@ -292,7 +292,7 @@ uint8_t Charger::update(const Measure& m, const Pages& pg, const AutoParams::Res
     latched_ |= err;
     hardCut = (err != 0U);
 
-    /* Utgang av-villkor (MaxChargeVolt 0 = utgang av, BESLUT nr 25) */
+    /* Utgang av-villkor (MaxChargeVolt 0 = utgang av, BESLUT nr 24) */
     ready = (mcv > 0U) && (cap > 0U) && (minPwm <= cap) &&
             ((chargeMode == ChargeModeAuto) || (chargeMode == ChargeModeSimple));
     if (ready && (chargeMode == ChargeModeAuto) &&

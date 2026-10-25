@@ -7,7 +7,7 @@
  *   E7: autovarden (compute med ignoreOverrides) -> man_* i sida 5.
  *       ovr-bitarna rors inte. Returnerar pageRefreshReq-bit 0x10.
  *   E8: effektiva -> stegtabell s1..s4 (sida 2): INTE implementerad
- *       (mappningen ar inte specificerad, BESLUT nr 25). Ingen andring,
+ *       (mappningen ar inte specificerad, BESLUT nr 28). Ingen andring,
  *       returnerar 0.
  *   E9: alla parametrar -> Auto, dvs. ovr-bitarna (sida 5 byte 8..10)
  *       nollas. man_* lamnas. Returnerar 0x10.

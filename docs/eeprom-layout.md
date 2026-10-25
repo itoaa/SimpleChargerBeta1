@@ -1,6 +1,6 @@
 # EEPROM-layout (TunerStudio v2.2)
 
-Status: modulen finns och är testad på PC, men den är **inte inkopplad** i `main.cpp`. Den kopplas in tillsammans med v2.2-protokollet ([BESLUT.md](../BESLUT.md) nr 6). Dagens firmware (B-2) läser och skriver alltså fortfarande inget i EEPROM.
+Status: modulen är testad på PC och sedan etapp 3 **inkopplad** i `main.cpp` tillsammans med v2.2-protokollet ([BESLUT.md](../BESLUT.md) nr 6). `load()` körs vid uppstart och `burn()` bara på TunerStudio-kommandot B. Inget av detta är verifierat på hårdvara eller i TunerStudio (se `docs/hil-testprotokoll.md`).
 
 Källor: `SPEC_tabeller_v2.2.md`, `SPEC_v2.2.md` och `SmedbyCharger_v2.2.ini`. De ligger i LTT-Swedens Drive-mapp, inte i repot.
 
@@ -68,17 +68,18 @@ Vid avvisning ändras varken EEPROM, utgången eller varningsbitarna. Testet `te
 
 En skrivning av hela layouten tar ungefär 308 × 3,3 ms ≈ 1 s. Det gäller bara när alla byte ändras. Siffran 3,3 ms per byte kommer från databladets tabell 8-2. Utgången är av under hela den tiden.
 
-Inkoppling sker med v2.2-protokollet:
+Inkopplingen i `main.cpp` (etapp 3):
 
-- `chargingActive` blir sant när laddning pågår, alltså när utgången är aktiv (`statusBits` b0).
-- `outputOff` sätter duty till 0.
-- `outputRestore` låter regulatorn starta mjukt igen.
-
-Tolkningen av "laddning pågår" och omstartsbeteendet bestäms vid inkopplingen.
+- `chargingActive` = `Charger::chargingActive()`: tillstånd i {Timer, SoftStart, Charging, PauseTemp}, eller duty > 0, eller diagMode == 1 (BESLUT.md nr 25).
+- `outputOff` sätter duty (OCR) till 0.
+- `outputRestore` sätter tillbaka laddarens aktuella duty. Eftersom B bara tillåts när laddning inte pågår är den i praktiken 0.
+- Resultatet av B syns bara via `eepromWarnBits` (b6 BurnFailed). En avvisad B ger ingen återkoppling i TunerStudio (öppen fråga, se BESLUT.md nr 26).
+- Kopieringsknapparna E7–E9 ändrar bara RAM-kopian. De bränner aldrig.
+- Vid uppstart: ogiltiga sidor ersätts med standardvärden och varningsbitar sätts, diagMode tvingas till Normal och laddaren startar AV.
 
 ## Statusbyte i realtidsdata (BESLUT.md nr 8 och 21)
 
-Realtidsblocket i `SPEC_tabeller_v2.2.md` är 114 B, och alla offset 0–113 är upptagna. Beslutet är en ny byte efter blocket, offset 114. Den finns bara som konstanter i `EepromRealtime` (`eepromStore.hpp`). Ini och protokoll är **inte** ändrade.
+Realtidsblocket i `SPEC_tabeller_v2.2.md` är 114 B, och alla offset 0–113 är upptagna. Beslutet är en ny byte efter blocket, offset 114. Sedan etapp 2 är den införd i protokollet (`TsLayout::RtBlockSize` = 115, A-svaret är 115 B) och i `tunerStudio_v2.2.ini` (`ochBlockSize = 115`, kanalen `eepromWarnBits`). Compat-filerna är oförändrade.
 
 | Offset | Namn | Typ | Innehåll |
 |---|---|---|---|
@@ -138,7 +139,7 @@ Repot innehåller **inga** säkringsvärden. Det finns inga fuse- eller avrdude-
 
 ## MaxChargeVolt-standardvärde (FÖRSLAG, inte godkänt)
 
-Standardvärdet är 0 = utgång av (`test_eeprom.cpp` kontrollerar det). Förslaget är att behålla det. Motivering och alternativ finns i BESLUT.md under "FÖRSLAG".
+Standardvärdet är 0 = utgång av (`test_eeprom.cpp` kontrollerar det), bekräftat i BESLUT.md nr 24. I `tunerStudio_v2.2.ini` visas voltLimit då som 0 med en röd indikator i stället för 15,00 V (BESLUT.md nr 33).
 
 ## Filer
 
