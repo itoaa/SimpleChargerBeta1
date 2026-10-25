@@ -15,6 +15,7 @@ Current::Current(int port, int pin, int acs712Type)
 	pACOffsetADC = 567;
 	pLastADCValue = 0;
 	pLastFilteredADCValue = 0;
+	pSaturated = false;
 
 	/* Port sets the pin direction. The pin value is the ADC channel. */
 	pADCPin.init(port, pAnalogIn);
@@ -38,7 +39,9 @@ int Current::readCurrent(void)
  	}
 
       pLastFilteredADCValue = rawValue.getFilteredValue();
-      return scaleAcs712Ma((uint16_t)pLastFilteredADCValue, pRefVoltage, pACOffset, mVperAmp);
+      /* 32-bitars heltal, klampat till +-32767 mA fore omvandling (BESLUT nr 37). */
+      return (int)scaleAcs712MaSat((uint16_t)pLastFilteredADCValue, (int16_t)pRefVoltage,
+                                   (int16_t)pACOffset, (int16_t)mVperAmp, &pSaturated);
 }
 
 /* Store the present reading as the 0 A offset. */

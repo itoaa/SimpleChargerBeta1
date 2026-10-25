@@ -18,6 +18,7 @@ Volt::Volt(uint8_t port, uint8_t pin, uint16_t maxVolt)
 	pMaxVolt = maxVolt;
 	pAnalogIn = pin;
 	pAnalogRefVolt = 5;
+	pLastADCValue = 0;
 	voltInit(adcPin, port, pAnalogIn);
 }
 
@@ -26,6 +27,7 @@ Volt::Volt(uint8_t port, uint8_t pin, uint16_t maxVolt, uint16_t refVolt)
 	pMaxVolt = maxVolt;
 	pAnalogIn = pin;
 	pAnalogRefVolt = refVolt;
+	pLastADCValue = 0;
 	voltInit(adcPin, port, pAnalogIn);
 }
 
@@ -37,5 +39,6 @@ uint16_t Volt::readVolt(void)
 	{
 		volt.addValue(adcPin.ADCRead(pAnalogIn));
 	}
-	return scaleAdcToVolt((uint16_t)volt.getFilteredValue(), pMaxVolt);
+	pLastADCValue = (uint16_t)volt.getFilteredValue();
+	return scaleAdcToVolt(pLastADCValue, pMaxVolt);
 }

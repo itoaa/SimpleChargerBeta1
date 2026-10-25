@@ -8,6 +8,16 @@ permissions:
   contents: write
 
 jobs:
+  host-tests:
+    # Vardtester for EEPROM-modulen (TunerStudio v2.2). Bygger inte firmware och committar inget.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run host tests
+        # Inkluderar golden-vektorer fran test/ref/auto_params_v2.2.py (python3).
+        run: make -C SimpleChargerBeta1/test test
+
   avr:
     runs-on: ubuntu-latest
     defaults:
@@ -24,6 +34,9 @@ jobs:
 
       - name: Create hex
         run: avr-objcopy -O ihex -R .eeprom charger.elf charger.hex
+
+      - name: Size limits (flash < 28 kB, statiskt RAM < 1,2 kB)
+        run: avr-size -B charger.elf && sh tools/check_size.sh charger.elf
 
       - uses: actions/upload-artifact@v4
         with:
