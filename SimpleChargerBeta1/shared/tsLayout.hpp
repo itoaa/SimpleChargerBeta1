@@ -148,6 +148,9 @@ const uint16_t RestrAmpTime     = 0x0080U;
 /* b8: senaste B avvisades (laddning pagick), andringar inte sparade.
  * Tillagg i den lediga hoga byten (BESLUT nr 35), satts av main, inte av Charger. */
 const uint16_t RestrBurnRejected = 0x0100U;
+/* b9: stromgivarens matvarde klampat till +-32767 mA (BESLUT nr 37).
+ * Levande (per matning), satts av main fran Current::saturated(). */
+const uint16_t RestrCurrentSat   = 0x0200U;
 
 } /* namespace TsLayout */
 
@@ -181,20 +184,26 @@ static inline int8_t scGetS8(const uint8_t* p)
     return s;
 }
 
-/* Lagg in RestrBurnRejected (b8) i restrictionBits i realtidsblocket efter
- * Charger::writeRealtime (BESLUT nr 35). Ovriga bitar orors. */
-static inline void tsRtSetBurnRejected(uint8_t* rt, bool rejected)
+/* Satt/nolla bitarna i mask i restrictionBits i realtidsblocket efter
+ * Charger::writeRealtime (main-agda bitar b8, b9). Ovriga bitar orors. */
+static inline void tsRtSetRestr(uint8_t* rt, uint16_t mask, bool on)
 {
     uint16_t r = scGetU16le(rt + TsLayout::RtRestrictionBits);
-    if (rejected)
+    if (on)
     {
-        r = (uint16_t)(r | TsLayout::RestrBurnRejected);
+        r = (uint16_t)(r | mask);
     }
     else
     {
-        r = (uint16_t)(r & (uint16_t)~TsLayout::RestrBurnRejected);
+        r = (uint16_t)(r & (uint16_t)~mask);
     }
     scPutU16le(rt + TsLayout::RtRestrictionBits, r);
+}
+
+/* RestrBurnRejected (b8), BESLUT nr 35. */
+static inline void tsRtSetBurnRejected(uint8_t* rt, bool rejected)
+{
+    tsRtSetRestr(rt, TsLayout::RestrBurnRejected, rejected);
 }
 
 #endif /* TS_LAYOUT_HPP_ */

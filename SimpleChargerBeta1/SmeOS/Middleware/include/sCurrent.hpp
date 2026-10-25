@@ -1,7 +1,9 @@
 /*
  * Current
  *
- * readCurrent() returns milliamps.
+ * readCurrent() returns milliamps, clamped to +-32767 mA before the
+ * conversion to int (BESLUT nr 37). saturated() is true when the last
+ * reading was clamped.
  * Type 1 = 5 A, 2 = 20 A, 3 = 30 A.
  */
 
@@ -20,6 +22,7 @@ private:
 	int  pACOffsetADC;
 	int	 pLastADCValue;
 	int	 pLastFilteredADCValue;
+	bool pSaturated;
 	sADC pADCPin;
 
 public:
@@ -28,6 +31,7 @@ public:
 	void  zeroAmpCalibrate();
 	void  setRefVoltage(int refMv);
 	int   getLastADCValue();
+	bool  saturated() const { return pSaturated; }
 };
 
 #endif /* SMEOS_MIDDLEWARE_INCLUDE_SCURRENT_HPP_ */

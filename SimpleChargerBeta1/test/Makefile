@@ -7,7 +7,7 @@
 #   make golden INI=<sokvag till SmedbyCharger_v2.2.ini> -> generera golden_defaults.inc
 
 CXX      ?= g++
-SANITIZE ?= -fsanitize=address,undefined -fno-sanitize-recover=all
+SANITIZE ?= -fsanitize=address,undefined,float-cast-overflow -fno-sanitize-recover=all
 CXXFLAGS  = -std=gnu++98 -O1 -g -Wall -Wextra -Werror -I../shared -I$(BUILD) $(SANITIZE)
 BUILD     = build
 
@@ -16,6 +16,7 @@ HOST_SRCS = test_eeprom.cpp $(STORE_SRCS)
 AUTO_SRCS = test_autoparams.cpp ../shared/autoParams.cpp $(STORE_SRCS)
 PROTO_SRCS = test_protocol.cpp ../shared/tunerStudio.cpp $(STORE_SRCS)
 CHG_SRCS  = test_charger.cpp ../shared/charger.cpp ../shared/autoParams.cpp $(STORE_SRCS)
+SCALE_SRCS = test_scale.cpp ../shared/scale.cpp
 PCMD_SRCS = test_pagecmd.cpp ../shared/pageCommands.cpp ../shared/autoParams.cpp $(STORE_SRCS)
 INI22     = ../tunerStudio_v2.2.ini
 
@@ -29,12 +30,13 @@ AVR_SRCS  = avr_probe.cpp ../shared/crc16.cpp ../shared/eepromStore.cpp ../share
 
 all: test
 
-test: $(BUILD)/test_eeprom $(BUILD)/test_autoparams $(BUILD)/test_protocol $(BUILD)/test_charger $(BUILD)/test_pagecmd
+test: $(BUILD)/test_eeprom $(BUILD)/test_autoparams $(BUILD)/test_protocol $(BUILD)/test_charger $(BUILD)/test_pagecmd $(BUILD)/test_scale
 	./$(BUILD)/test_eeprom
 	./$(BUILD)/test_autoparams
 	./$(BUILD)/test_protocol
 	./$(BUILD)/test_charger
 	./$(BUILD)/test_pagecmd
+	./$(BUILD)/test_scale
 	python3 ref/auto_params_v2.2.py > /dev/null
 	python3 -B check_ini_layout.py $(INI22)
 	python3 -B ref/validate_ini_v2.2.py $(INI22) --sig "MSII s-Charger 2.2  " --och 115 --page 38,84,38,68,64
@@ -46,6 +48,10 @@ $(BUILD)/test_protocol: $(PROTO_SRCS) $(wildcard ../shared/*.hpp)
 $(BUILD)/test_charger: $(CHG_SRCS) $(wildcard ../shared/*.hpp)
 	mkdir -p $(BUILD)
 	$(CXX) $(CXXFLAGS) $(CHG_SRCS) -o $@
+
+$(BUILD)/test_scale: $(SCALE_SRCS) $(wildcard ../shared/*.hpp)
+	mkdir -p $(BUILD)
+	$(CXX) $(CXXFLAGS) $(SCALE_SRCS) -o $@
 
 $(BUILD)/test_pagecmd: $(PCMD_SRCS) $(wildcard ../shared/*.hpp)
 	mkdir -p $(BUILD)

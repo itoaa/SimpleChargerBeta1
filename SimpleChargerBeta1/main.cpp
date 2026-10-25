@@ -323,6 +323,8 @@ int main()
 			AutoParams::writeRealtime(gAuto, rt);
 			/* B avvisad under laddning -> restrictionBits b8 (BESLUT nr 35). */
 			tsRtSetBurnRejected(rt, gStore.burnRejectedCharging());
+			/* Stromgivaren mattad (+-32767 mA) -> restrictionBits b9 (BESLUT nr 37). */
+			tsRtSetRestr(rt, TsLayout::RestrCurrentSat, outputCurrent.saturated());
 			rt[TsLayout::RtPageRefreshReq] = gApp.refresh;
 			rt[TsLayout::RtEepromWarnBits] = gStore.warnBits();
 

@@ -257,3 +257,22 @@ Uppdrag från Ola 2026-10-25: avvisad B ska synas. Valet av plats gjordes vid im
 - tunerStudio_v2.2.ini har en ny röd indikator `{ errorBits & 4096 }`. Mätaren errorBitsGauge har max 8191.
 - Inte verifierat i TunerStudio.
 
+
+## 37. Strömskalning i 32-bitars heltal och mättnadsbit b9 (2026-10-25)
+Förslag 3 i docs/forslag-2-3-4-6.md, godkänt av Ola 2026-10-25 11:48 (via Max).
+
+- `scaleAcs712Ma32(adc, refMv, offsetMv, mVperAmp)` i shared/scale.cpp räknar i int32 utan double. mV avrundas till närmaste heltal och mA trunkeras mot 0, som den gamla `(int)`-casten.
+  - adc > 1023 behandlas som 1023, och mVperAmp ≤ 0 ger 0.
+  - Mellanvärdena ryms i int32.
+- `scaleAcs712MaSat(...)` klampar resultatet till ±32 767 mA **före** omvandlingen till int16_t och rapporterar om klampning skedde.
+  - `Current::readCurrent()` returnerar fortfarande `int` och sparar flaggan, som läses med `Current::saturated()`.
+- Den gamla `scaleAcs712Ma` (double, `(int)`-cast) är borttagen. Den hade odefinierat beteende över ±32 767 mA på AVR, och sCurrent var enda användaren.
+- `zeroAmpCalibrate()` är oförändrad (double). Trunkering i stället för avrundning ger högst cirka 1 mV, vilket motsvarar cirka 15 mA för typ 3 [U].
+- **restrictionBits b9** (`TsLayout::RestrCurrentSat` = 0x0200) visar att senaste strömmätningen var mättad.
+  - Biten är levande, inte låst, och sätts i main.cpp med `tsRtSetRestr()` efter `writeRealtime`. Laddaren rör inte biten.
+  - En mättad mätning ger ±3 276 cA, vilket alltid är ≥ MaxChargeAmp (högst 1 500). Därmed sätts ErrOverAmpOut och duty blir 0 samma varv.
+- tools/make_ini22.py och tunerStudio_v2.2.ini har en gul indikator `{ restrictionBits & 512 }`. check_ini_layout kontrollerar masken.
+- Testbygget kör `-fsanitize=float-cast-overflow` utöver ASan/UBSan.
+  - Ny test/test_scale.cpp.
+  - Mutationskontroll: den gamla double/int16-varianten fälls av sanitizern ("-41157 is outside the range of 'short int'").
+- Inte verifierat på hårdvara (ADC, givare) eller i TunerStudio.

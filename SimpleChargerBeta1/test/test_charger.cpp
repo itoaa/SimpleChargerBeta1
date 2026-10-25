@@ -34,12 +34,14 @@ struct Sim
     int32_t capCAh;      /* modellkapacitet */
     int64_t chargeCAhMs; /* laddning i cA*ms */
     int16_t forceCa;     /* >= 0: tvinga matt strom */
+    bool forceRaw;       /* true: matt strom = rawCa (aven negativ) */
+    int16_t rawCa;
     int32_t extraCv;     /* adderas till matt spanning */
     uint16_t inCv;
 
     explicit Sim(EepromStore& s)
         : store(&s), ch(), now(1000U), connected(true), vocBase(1200), vocMax(1436), capCAh(6000),
-          chargeCAhMs(0), forceCa(-1), extraCv(0), inCv(2000U)
+          chargeCAhMs(0), forceCa(-1), forceRaw(false), rawCa(0), extraCv(0), inCv(2000U)
     {
         memset(&ar, 0, sizeof(ar));
     }
@@ -68,6 +70,7 @@ struct Sim
         int32_t ca = connected ? (int32_t)ch.duty() * 100 : 0;
         int32_t v = connected ? voc() + (ca * 5) / 100 : (ch.duty() > 0U ? 1500 : 0);
         if (forceCa >= 0) { ca = forceCa; }
+        if (forceRaw) { ca = rawCa; }
         v += extraCv;
         m.outCv = (uint16_t)((v < 0) ? 0 : v);
         m.inCv = inCv;
@@ -545,6 +548,37 @@ static void testBurnRejectedIndicator()
     CHECK(ng.burn() == EepromStore::BurnRejectedNoGuard && !ng.burnRejectedCharging());
 }
 
+/* BESLUT nr 37 (forslag 3): mattad stromgivare (+-32767 mA = +-3276 cA i
+ * main) ger alltid ErrOverAmpOut och duty 0 samma varv; b9 satts av main
+ * via tsRtSetRestr och rors inte av laddlogiken. */
+static void testCurrentSaturation()
+{
+    CHECK(RestrCurrentSat == 0x0200U && (RestrCurrentSat & (RestrBurnRejected | 0x00FFU)) == 0U);
+    {
+        uint8_t rt[RtBlockSize]; memset(rt, 0x5A, sizeof(rt));
+        tsRtSetRestr(rt, RestrCurrentSat, true);
+        CHECK(scGetU16le(rt + RtRestrictionBits) == (uint16_t)(0x5A5AU | 0x0200U));
+        tsRtSetRestr(rt, RestrCurrentSat, false);
+        CHECK(scGetU16le(rt + RtRestrictionBits) == (uint16_t)(0x5A5AU & ~0x0200U));
+        CHECK(rt[RtErrorBits] == 0x5AU);
+    }
+    static const int16_t sat[2] = { 3276, -3276 };
+    for (int k = 0; k < 2; ++k)
+    {
+        EepromStore st(be());
+        setupStore(st, 1500U);
+        st.page(4)[P5ModeBits] = (uint8_t)((st.page(4)[P5ModeBits] & ~3U) | ChargeModeSimple);
+        setU16(st, 0, EepromLayout::P1MaxChargeAmp, 3000U);   /* -> 1500 */
+        Sim s(st); s.recompute();
+        s.ch.command(1U); s.run(2000U);
+        CHECK(s.ch.duty() > 0U);
+        s.forceRaw = true; s.rawCa = sat[k];
+        s.tick();
+        CHECK((s.ch.errorBits() & ErrOverAmpOut) != 0U && s.ch.duty() == 0U);
+        CHECK((rt16(s, RtRestrictionBits) & RestrCurrentSat) == 0U);
+    }
+}
+
 int main()
 {
     testBootOffAndMcvZero();
@@ -557,6 +591,7 @@ int main()
     testTimerStart();
     testCountersAndDiag();
     testBurnRejectedIndicator();
+    testCurrentSaturation();
     printf("test_charger: %d kontroller, %d fel\n", g_checks, g_fails);
     return (g_fails == 0) ? 0 : 1;
 }
