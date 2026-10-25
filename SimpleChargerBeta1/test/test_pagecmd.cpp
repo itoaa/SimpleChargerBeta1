@@ -392,6 +392,39 @@ static void testHwClamp()
 }
 
 /* 5: AH_MISSING / NOMV_INVALID -> ingen andring, 0 */
+/* BESLUT nr 46: driverVoltMin/Max (sida 3, U08 0,1 V) <= HwDriverVoltMaxDv = 160 */
+static void testDriverClamp()
+{
+    EepromStore s(be());
+    s.loadDefaults();
+    uint8_t* p3 = s.page(PageIdx3);
+    /* standardvarden 10,0/16,0 V ligger inom taket och andras inte */
+    CHECK(p3[P3DriverVoltMin] == 100U && p3[P3DriverVoltMax] == 160U);
+    CHECK(!PageCommands::clampHwLimits(PageIdx3, p3, 0U, EepromLayout::Page3Size));
+    CHECK(p3[P3DriverVoltMin] == 100U && p3[P3DriverVoltMax] == 160U);
+    /* gransvarden, en byte (som W) */
+    p3[P3DriverVoltMax] = 161U;
+    CHECK(PageCommands::clampHwLimits(PageIdx3, p3, P3DriverVoltMax, 1U) && p3[P3DriverVoltMax] == 160U);
+    p3[P3DriverVoltMax] = 159U;
+    CHECK(!PageCommands::clampHwLimits(PageIdx3, p3, P3DriverVoltMax, 1U) && p3[P3DriverVoltMax] == 159U);
+    p3[P3DriverVoltMin] = 200U;
+    CHECK(PageCommands::clampHwLimits(PageIdx3, p3, P3DriverVoltMin, 1U) && p3[P3DriverVoltMin] == 160U);
+    /* hel sida (X / uppstart) */
+    p3[P3DriverVoltMin] = 255U;
+    p3[P3DriverVoltMax] = 250U;
+    CHECK(PageCommands::clampHwLimits(PageIdx3, p3, 0U, EepromLayout::Page3Size));
+    CHECK(p3[P3DriverVoltMin] == 160U && p3[P3DriverVoltMax] == 160U);
+    /* skrivning som inte tacker byten klampar den inte */
+    p3[P3DriverVoltMax] = 250U;
+    CHECK(!PageCommands::clampHwLimits(PageIdx3, p3, P3DriverVoltMin, 1U) && p3[P3DriverVoltMax] == 250U);
+    CHECK(!PageCommands::clampHwLimits(PageIdx3, p3, (uint16_t)(P3DriverVoltMax + 1U), 4U) && p3[P3DriverVoltMax] == 250U);
+    /* samma offset pa andra sidor ror inte sida 3-regeln */
+    uint8_t* p2 = s.page(PageIdx2);
+    p2[P3DriverVoltMax] = 250U;
+    (void)PageCommands::clampHwLimits(PageIdx2, p2, 0U, EepromLayout::Page2Size);
+    CHECK(p2[P3DriverVoltMax] == 250U);
+}
+
 static void testE8Blocked()
 {
     EepromStore s(be());
@@ -510,6 +543,7 @@ int main()
     testE8Restart();
     testE8Clamp();
     testHwClamp();
+    testDriverClamp();
     testE8Blocked();
     testRefreshHold();
     testE8Matrix();

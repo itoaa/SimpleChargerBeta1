@@ -64,7 +64,8 @@ def first_at(page, off):
 for k, page, name in (('P3SensorBits', 3, None), ('P3DiagMode', 3, 'diagMode'), ('P3DiagDuty', 3, 'diagDuty'),
                       ('P5ModeBits', 5, 'chargeMode'), ('P5TypeBits', 5, 'batteryType'),
                       ('P5CapacityAh', 5, 'capacityAh'), ('P2StartBits', 2, 'startMode'),
-                      ('P2StartDelayMin', 2, 'startDelayMin')):
+                      ('P2StartDelayMin', 2, 'startDelayMin'),
+                      ('P3DriverVoltMin', 3, 'driverVoltMin'), ('P3DriverVoltMax', 3, 'driverVoltMax')):
     names = first_at(page, ts[k])
     checked += 1
     if not names or (name is not None and name not in names):
@@ -106,6 +107,10 @@ volt_fields = (['MaxChargeVolt'] +
                                      'voltLimit', 'batteryPresentVolt')])
 for n in volt_fields:
     expect('%s hi (HwVoltMaxCv)' % n, hw.get('HwVoltMaxCv'), ini_hi(n, 100))
+
+# BESLUT nr 46: driverVolt (sida 3, U08 0,1 V) mot HwDriverVoltMaxDv (offset kontrolleras ovan)
+for n in ('driverVoltMin', 'driverVoltMax'):
+    expect('%s hi (HwDriverVoltMaxDv)' % n, hw.get('HwDriverVoltMaxDv'), ini_hi(n, 10))
 
 # BESLUT nr 45: autolagets nominella spanningar (autoParams.cpp NomvCount/kCells) mot ini
 apsrc = open(os.path.join(ROOT, 'shared', 'autoParams.cpp')).read()

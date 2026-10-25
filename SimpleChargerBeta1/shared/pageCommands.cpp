@@ -182,6 +182,18 @@ uint8_t refreshTick(RefreshHold& h, uint32_t nowMs, uint32_t holdMs)
     return h.bits;
 }
 
+/* Klampar U08 vid p+o om byten ingick i [off, off+len). */
+static bool clampByte(uint8_t* p, uint16_t o, uint16_t off, uint16_t len, uint8_t hi)
+{
+    bool changed = false;
+    if ((off <= o) && ((uint32_t)o < (uint32_t)off + (uint32_t)len) && (p[o] > hi))
+    {
+        p[o] = hi;
+        changed = true;
+    }
+    return changed;
+}
+
 /* Klampar U16 vid p+o om [off, off+len) tacker faltet helt. */
 static bool clampField(uint8_t* p, uint16_t o, uint16_t off, uint16_t len, uint16_t hi)
 {
@@ -217,6 +229,15 @@ bool clampHwLimits(uint8_t pageIdx, uint8_t* page, uint16_t off, uint16_t len)
             {
                 changed = true;
             }
+        }
+    }
+    else if (pageIdx == TsLayout::PageIdx3)
+    {
+        /* BESLUT nr 46: driverVolt 0..16,0 V */
+        changed = clampByte(page, TsLayout::P3DriverVoltMin, off, len, HwLimits::HwDriverVoltMaxDv);
+        if (clampByte(page, TsLayout::P3DriverVoltMax, off, len, HwLimits::HwDriverVoltMaxDv))
+        {
+            changed = true;
         }
     }
     else

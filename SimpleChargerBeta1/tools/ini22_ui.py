@@ -1,6 +1,6 @@
 # -*- coding: ascii -*-
 # Presentationssteg for tunerStudio_v2.2.ini (anropas av tools/make_ini22.py).
-# BESLUT nr 42 (strom 0..15 A), nr 43 (spanning 0..55 V, driverVolt 0..20 V) och
+# BESLUT nr 42 (strom 0..15 A), nr 43 (spanning 0..55 V), nr 46 (driverVolt 0..16 V) och
 # nr 44 (presentation: engelska texter, en teckenkodning, framsida, hjalp, menyer).
 # Andrar bara presentation och min/max (hi). Namn, typer, offset, skala och
 # standardvarden (utom oversatta alternativtexter) ar oforandrade; det kontrolleras
@@ -19,6 +19,7 @@ HW = hw_limits()
 def num(x):
     return ('%.2f' % x).rstrip('0').rstrip('.')
 HW_VOLT = num(HW['HwVoltMaxCv'] / 100.0)          # '55'
+HW_DRV = num(HW['HwDriverVoltMaxDv'] / 10.0)      # '16' (BESLUT nr 46)
 
 D = '\xb0'          # grad-tecknet (latin-1 0xB0)
 DC = D + 'C'
@@ -89,13 +90,13 @@ HI_AMP = ([s + x for s in STEP for x in ('_current', '_endAmpMax', '_endAmpMin')
 HI_VOLT = ([s + x for s in STEP for x in ('_volt', '_endVoltMax', '_endVoltMin')] +
            ['man_absorbVolt', 'man_floatVolt', 'man_restartVolt', 'man_prechargeVolt',
             'man_voltLimit', 'man_batteryPresentVolt'])            # BESLUT nr 43
-HI_DRV = ['driverVoltMin', 'driverVoltMax']                        # BESLUT nr 43
+HI_DRV = ['driverVoltMin', 'driverVoltMax']                        # BESLUT nr 43, 46
 HI = {}
 HI.update({n: ('30', '15') for n in HI_AMP})
 HI.update({n: ('60', HW_VOLT) for n in HI_VOLT})   # BESLUT nr 45: HwVoltMaxCv
 # Falt som redan har ratt hi i kallfilen men ska folja firmware (kontrolleras, andras inte)
 HI_CHECK = {'MaxChargeVolt': HW_VOLT}                            # BESLUT nr 45
-HI.update({n: ('25', '20') for n in HI_DRV})
+HI.update({n: ('25', HW_DRV) for n in HI_DRV})     # BESLUT nr 46: HwDriverVoltMaxDv
 
 METHOD = ['Constant current (CC)', 'Constant voltage (CV)', 'Monitor', 'Off']
 ONEND = ['Next stage', 'Go to stage 1', 'Stop (done)', 'Stop with error']
@@ -744,8 +745,8 @@ def ctx():
      ('pwmFreqKHz', 'PWM frequency. Not active: the firmware uses a fixed 31 kHz.'),
      ('softStartMs', 'Soft start time from 0 to setpoint. Not active.'),
      ('dutyStepMax', 'Max PWM change per control loop. Not active.'),
-     ('driverVoltMin', 'Gate driver voltage below this value = error. Not active.'),
-     ('driverVoltMax', 'Gate driver voltage above this value = error. Not active.'),
+     ('driverVoltMin', 'Gate driver voltage below this value = error. Not active. Range 0-16 V.'),
+     ('driverVoltMax', 'Gate driver voltage above this value = error. Not active. Range 0-16 V; the firmware limits stored values to 16.0 V.'),
      ('mosfetTempSensor', 'MOSFET temperature sensor. Not active.'),
      ('batTempSensor', 'Battery temperature sensor. Not active.'),
      ('currentSensor', 'Fitted current sensor type (gives the scale). Takes effect after a controller restart. Shunt + amplifier is not supported.'),

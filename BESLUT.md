@@ -509,3 +509,12 @@ Kvar: 6/12/24/36 V. Högsta voltLimit är 45,00 V (bly 18 celler) [kontrolleras 
 **[U]:**
 - Att RAM-klampningen efter W/X gör att TS och firmware har olika värde tills sidan läses om. ini-max hindrar normalt inmatning över 55 V.
 - Om TS skriver U16 byte för byte med W. Då klampas inte fältet vid skrivning, men läsningen av MaxChargeVolt är begränsad och klampningen vid uppstart gäller.
+
+## 46. driverVolt max 16 V (2026-10-25)
+Olas beslut 2026-10-25 14:13 (via Max): driverVolt max sätts till 16 V. Ersätter driverVolt 0..20 V i nr 43.
+
+- En konstant: `HwLimits::HwDriverVoltMaxDv = 160` (16,0 V, 0,1 V-steg) i `shared/hwLimits.hpp`.
+- Firmware: `PageCommands::clampHwLimits()` begränsar `driverVoltMin` och `driverVoltMax` (sida 3, offset 4/5, nya konstanter `TsLayout::P3DriverVoltMin/Max`) till 160 efter varje W/X som täcker byten och efter `load()` vid uppstart. Bara i RAM, ingen burn. Fälten är U08, så även en W på en byte klampas.
+- ini: `tools/ini22_ui.py` hämtar konstanten och sätter `hi` = 16 för båda fälten. Hjälptexten anger 0-16 V. `test/check_ini_layout.py` fäller om ini-max eller offset skiljer sig från firmware.
+- Standardvärden oförändrade: `eepromDefaults` har redan driverVoltMin 100 (10,0 V) och driverVoltMax 160 (16,0 V), och ini-default är 16. Ingen ändring av EEPROM-layout, format eller golden.
+- Inte ändrat: mätaren `driverVoltGauge` (0..20 V) och övriga mätarskalor. Fälten driverVoltMin/Max används fortfarande inte av firmware för någon felkontroll (inte aktiva).

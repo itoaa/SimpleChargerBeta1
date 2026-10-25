@@ -48,7 +48,8 @@ uint8_t apply(uint8_t code, uint8_t* page5, uint8_t* page2, const AutoParams::In
  * [off, off+len) tacker hela faltet, sa att en halv skrivning (W skriver
  * en byte) inte ger ett blandat varde. Sida 1: MaxChargeVolt <= HwVoltMaxCv.
  * Sida 5: man_absorbVolt/floatVolt/restartVolt/prechargeVolt/voltLimit/
- * batteryPresentVolt <= HwVoltMaxCv. Returnerar true om nagot andrades.
+ * batteryPresentVolt <= HwVoltMaxCv. Sida 3: driverVoltMin/driverVoltMax
+ * <= HwDriverVoltMaxDv (BESLUT nr 46). Returnerar true om nagot andrades.
  * Bara RAM-kopian andras (ingen burn). */
 bool clampHwLimits(uint8_t pageIdx, uint8_t* page, uint16_t off, uint16_t len);
 

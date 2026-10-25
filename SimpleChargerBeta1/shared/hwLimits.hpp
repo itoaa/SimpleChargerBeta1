@@ -10,6 +10,8 @@
  *                     E8-klampningen, klampning av MaxChargeVolt och man_*
  *                     spanningsfalt vid skrivning, och ini-max for
  *                     MaxChargeVolt, man_* och s1..s4 spanningsfalt.
+ *   HwDriverVoltMaxDv 16,0 V drivspanning (BESLUT nr 46), sida 3
+ *                     driverVoltMin/driverVoltMax (U08, 0,1 V).
  */
 #ifndef SHARED_HWLIMITS_HPP_
 #define SHARED_HWLIMITS_HPP_
@@ -19,6 +21,7 @@
 namespace HwLimits {
 
 const uint16_t HwVoltMaxCv = 5500U;
+const uint8_t  HwDriverVoltMaxDv = 160U;
 
 } /* namespace HwLimits */
 

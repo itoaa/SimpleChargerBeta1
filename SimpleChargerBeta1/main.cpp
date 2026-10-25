@@ -216,6 +216,7 @@ int main()
 	(void)gStore.load();          /* ogiltig sida -> standard + eepromWarnBits */
 	/* BESLUT nr 45: aldre EEPROM-varden over hardvarutaken begransas i RAM (ingen burn) */
 	(void)PageCommands::clampHwLimits(TsLayout::PageIdx1, gStore.page(TsLayout::PageIdx1), 0U, EepromLayout::Page1Size);
+	(void)PageCommands::clampHwLimits(TsLayout::PageIdx3, gStore.page(TsLayout::PageIdx3), 0U, EepromLayout::Page3Size);
 	(void)PageCommands::clampHwLimits(TsLayout::PageIdx5, gStore.page(TsLayout::PageIdx5), 0U, EepromLayout::Page5Size);
 	gBootSensorSel = PageCommands::sensorSel(gStore.page(TsLayout::PageIdx3));
 	computeAuto();

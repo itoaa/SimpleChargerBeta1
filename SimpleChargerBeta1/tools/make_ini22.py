@@ -29,7 +29,7 @@ hdr_add = (
 ";   * E8 (Kopiera effektiva -> stegtabell s1-s4): s1 bulk, s2 absorption, s3 float, s4 overvaka;\n"
 ";     forladdning foljer inte med; ignoreras vid AH_MISSING/NOMV_INVALID; ingen burn (BESLUT nr 40).\n"
 ";   * Strom 0..15 A i alla stromfalt och matare (BESLUT nr 42), spanning 0..55 V och\n"
-";     driverVolt 0..20 V (BESLUT nr 43).\n"
+";     driverVolt 0..16 V (BESLUT nr 43, 46; hamtas ur shared/hwLimits.hpp).\n"
 ";   * Spanningstak 55 V ut / 65 V in (BESLUT nr 45): ini-max for spanningsfalten hamtas ur\n"
 ";     shared/hwLimits.hpp (HwVoltMaxCv). Autolaget erbjuder 6/12/24/36 V; index 4..7 ogiltiga.\n"
 ";   * Presentation (BESLUT nr 44, tools/ini22_ui.py): engelska texter, en teckenkodning\n"

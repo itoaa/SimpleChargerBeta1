@@ -51,6 +51,8 @@ const uint8_t  StartManual = 0U, StartAuto = 1U, StartTimer = 2U;
 const uint16_t P3SensorBits     = 6U;   /* [0:1] mosfet, [2:3] bat, [4:5] currentSensor, [6] ampZeroAtBoot, [7] inAmpSensor */
 const uint16_t P3DiagMode       = 16U;  /* [0:1], se EepromLayout::P3DiagModeOffset */
 const uint16_t P3DiagDuty       = 17U;
+const uint16_t P3DriverVoltMin  = 4U;   /* U08 0,1 V (inte aktiv), tak HwDriverVoltMaxDv (BESLUT nr 46) */
+const uint16_t P3DriverVoltMax  = 5U;   /* U08 0,1 V (inte aktiv), tak HwDriverVoltMaxDv (BESLUT nr 46) */
 
 /* ---- Sida 5: autolage ------------------------------------------------ */
 const uint16_t P5ModeBits       = 0U;   /* [0:1] chargeMode, [2:2] tempCompEnable */
