@@ -25,7 +25,7 @@ Källor: `SPEC_tabeller_v2.2.md`, `SPEC_v2.2.md` och `SmedbyCharger_v2.2.ini`. D
 - Sidindex 0–4 i koden motsvarar sida 1–5 och ini-kommandona `P\000`–`P\004`.
 - CRC är CRC-16/CCITT-FALSE: polynom 0x1021, startvärde 0xFFFF, ingen reflektion, ingen slut-XOR. Kontrollvärde: `"123456789"` → `0x29B1`.
 
-### Basadress 16 (förslag)
+### Basadress 16 (BESLUT.md nr 20)
 
 - **Adress 0 undviks.** Vid brownout under en EEPROM-skrivning är adress 0 den cell som oftast skadas, eftersom adressregistret EEAR nollställs vid reset. [U] Det bygger på erfarenhet från AVR-communityt, inte på databladet. Databladet (DS40002061B, avsnitt 8.4.2) säger att man ska hålla RESET aktiv vid för låg spänning, alltså använda BOD.
 - **0–15 är reserverade** för framtida bruk, till exempel serienummer eller startflagga. Modulen läser och skriver dem aldrig, vilket testet `testReservedArea` kontrollerar.
@@ -76,9 +76,9 @@ Inkoppling sker med v2.2-protokollet:
 
 Tolkningen av "laddning pågår" och omstartsbeteendet bestäms vid inkopplingen.
 
-## Statusbyte i realtidsdata (BESLUT.md nr 8, offset är förslag)
+## Statusbyte i realtidsdata (BESLUT.md nr 8 och 21)
 
-Realtidsblocket i `SPEC_tabeller_v2.2.md` är 114 B, och alla offset 0–113 är upptagna. Förslaget är en ny byte efter blocket. Den finns bara som konstanter i `EepromRealtime` (`eepromStore.hpp`). Ini och protokoll är **inte** ändrade.
+Realtidsblocket i `SPEC_tabeller_v2.2.md` är 114 B, och alla offset 0–113 är upptagna. Beslutet är en ny byte efter blocket, offset 114. Den finns bara som konstanter i `EepromRealtime` (`eepromStore.hpp`). Ini och protokoll är **inte** ändrade.
 
 | Offset | Namn | Typ | Innehåll |
 |---|---|---|---|
@@ -101,9 +101,9 @@ Bitar:
 
 En lyckad B nollar alla bitar. En avvisad B (laddning pågår) ändrar dem inte. Om TunerStudio ska visa "B avvisad" kan det läggas till senare, till exempel som ett svar på B. Det är inte bestämt.
 
-## Standardvärden för tabeller (förslag [U])
+## Standardvärden för tabeller (BESLUT.md nr 22)
 
-Ini-filen saknar `defaultValue` för tabellerna på sida 1 och 4. Med nollor skulle axlarna inte vara stigande och tabellerna vore oanvändbara. Värdena nedan är **förslag**. De beräknas i `test/table_proposals.py` och kontrolleras byte för byte mot `eepromDefaults.cpp` via `golden_defaults.inc`.
+Ini-filen saknar `defaultValue` för tabellerna på sida 1 och 4. Med nollor skulle axlarna inte vara stigande och tabellerna vore oanvändbara. Värdena nedan är godkända (BESLUT.md nr 22). **NTC-tabellerna (mosfetTempADCTable/mosfetTempTable och batNtcADC/batNtcTemp) är platshållare**, eftersom kortet saknar NTC. De beräknas i `test/table_proposals.py` och kontrolleras byte för byte mot `eepromDefaults.cpp` via `golden_defaults.inc`.
 
 | Fält | Sida/offset | Förslag | Skäl |
 |---|---|---|---|
@@ -133,7 +133,12 @@ Repot innehåller **inga** säkringsvärden. Det finns inga fuse- eller avrdude-
 | 16 MHz säkert område | ≥ ca 3,8 V | linjärt 10 MHz @ 2,7 V → 20 MHz @ 4,5 V (avsnitt 29.3), uträknat |
 
 - Med BOD 2,7 V och 16 MHz finns ett spänningsområde, ungefär 2,7–3,8 V, där CPU:n inte garanterat räknar rätt. Där kan ett felaktigt EEPROM-anrop i teorin ske. CRC och huvudet-sist skyddar mot att trasiga data *används*, men inte mot att de skrivs.
-- Alternativet är BODLEVEL 100 = 4,3 V (efuse 0xFC). Det är **Olas beslut** och måste läsas av eller sättas på riktiga kort, till exempel med `avrdude -U efuse:r:-:h`.
+- **Beslut (BESLUT.md nr 23): BOD 4,3 V, efuse 0xFC** (BODLEVEL[2:0] = 100, tabell 29-12). lfuse och hfuse ändras inte. Ola sätter säkringen själv med ISP-programmerare. De exakta avrdude-kommandona för att läsa av och sätta säkringen, och vad som inte är verifierat (bland annat MCU:ns VCC), står i BESLUT.md nr 23.
+- BurnGuard kompletterar BOD men ersätter den inte.
+
+## MaxChargeVolt-standardvärde (FÖRSLAG, inte godkänt)
+
+Standardvärdet är 0 = utgång av (`test_eeprom.cpp` kontrollerar det). Förslaget är att behålla det. Motivering och alternativ finns i BESLUT.md under "FÖRSLAG".
 
 ## Filer
 
