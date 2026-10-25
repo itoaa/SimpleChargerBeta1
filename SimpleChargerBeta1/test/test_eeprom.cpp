@@ -120,6 +120,8 @@ static void testLayout()
     CHECK(HeaderSize == 6U);
     CHECK(TotalSize == 308U);
     CHECK(BaseAddress + TotalSize <= 1024U);
+    CHECK(BaseAddress == 16U && ReservedBytes == 16U);
+    CHECK(BaseAddress + TotalSize == 324U);
     uint16_t ram = 0U, addr = BaseAddress + HeaderSize;
     for (uint8_t p = 0U; p < PageCount; ++p)
     {
@@ -284,6 +286,29 @@ static void testRoundTrip()
     }
 }
 
+/* Basadress 16: adress 0..15 skrivs aldrig och innehall dar paverkar inte load */
+static void testReservedArea()
+{
+    for (int fill = 0; fill < 2; ++fill)
+    {
+        g_mock.reset(fill ? 0x00U : 0xFFU);
+        uint8_t before[EepromLayout::ReservedBytes];
+        memcpy(before, g_mock.mem, sizeof(before));
+        EepromStore a(mockBackend());
+        fillPattern(a);
+        CHECK(a.burn());
+        CHECK(memcmp(before, g_mock.mem, sizeof(before)) == 0);
+        /* Skrap i 0..15 (t.ex. B-2-data eller brownout-korruption av adress 0) */
+        for (uint16_t i = 0U; i < EepromLayout::ReservedBytes; ++i) { g_mock.mem[i] = (uint8_t)(0x5AU ^ i); }
+        EepromStore b(mockBackend());
+        CHECK(b.load() == 0U);
+        for (uint8_t p = 0U; p < EepromLayout::PageCount; ++p)
+        {
+            CHECK(memcmp(a.page(p), b.page(p), a.pageSize(p)) == 0);
+        }
+    }
+}
+
 static void testCorruptPage()
 {
     for (uint8_t bad = 0U; bad < EepromLayout::PageCount; ++bad)
@@ -335,8 +360,9 @@ static void testHeader()
     g_mock.reset(0xFFU);
     EepromStore a(mockBackend());
     CHECK(a.burn());
-    g_mock.mem[2] = (uint8_t)(EepromLayout::LayoutVersion + 1U);
-    scPutU16le(&g_mock.mem[4], crc16(g_mock.mem, 4U));
+    uint8_t* hdr = &g_mock.mem[EepromLayout::BaseAddress];
+    hdr[2] = (uint8_t)(EepromLayout::LayoutVersion + 1U);
+    scPutU16le(&hdr[4], crc16(hdr, 4U));
     EepromStore b(mockBackend());
     CHECK(b.load() == EepromStore::WarnHeaderInvalid);
 }
@@ -488,6 +514,7 @@ int main()
     testTableDefaults();
     testBlankAndOldEeprom();
     testRoundTrip();
+    testReservedArea();
     testCorruptPage();
     testHeader();
     testDiagMode();

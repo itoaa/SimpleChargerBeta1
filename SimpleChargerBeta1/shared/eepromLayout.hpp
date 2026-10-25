@@ -48,8 +48,15 @@ const uint16_t Page4RamOffset = Page3RamOffset + Page3Size;
 const uint16_t Page5RamOffset = Page4RamOffset + Page4Size;
 
 /* ---- EEPROM-adresser ------------------------------------------------- */
-/* Huvud: magic[2] + layoutversion + antal sidor + CRC16 over de 4 forsta. */
-const uint16_t BaseAddress    = 0U;
+/* Basadress 16 (forslag, se docs/eeprom-layout.md):
+ *  - adress 0 undviks: vid brownout under skrivning ar adress 0 den
+ *    vanligaste korrumperade cellen (EEAR nollas vid reset) [U: erfarenhet
+ *    fran AVR-communityt, inte databladet];
+ *  - 0..15 reserveras (skrivs aldrig av modulen) for framtida bruk;
+ *  - 16 + 308 = 324 <= 1024: 700 B marginal for senare layouter.
+ * Huvud: magic[2] + layoutversion + antal sidor + CRC16 over de 4 forsta. */
+const uint16_t ReservedBytes  = 16U;     /* 0..15 reserverade, ror ej */
+const uint16_t BaseAddress    = ReservedBytes;
 const uint8_t  Magic0         = 0x53U;   /* 'S' */
 const uint8_t  Magic1         = 0x43U;   /* 'C' */
 const uint8_t  LayoutVersion  = 1U;      /* hoj vid varje layoutandring */
@@ -107,6 +114,7 @@ uint16_t pageAddress(uint8_t page);
 /* ---- Statiska kontroller (C++98: negativ arraystorlek = kompileringsfel) */
 typedef char eepromPagesTotalIs292[(EepromLayout::PagesTotalSize == 292U) ? 1 : -1];
 typedef char eepromTotalIs308[(EepromLayout::TotalSize == 308U) ? 1 : -1];
+typedef char eepromBaseNotZero[((EepromLayout::BaseAddress != 0U) && (EepromLayout::BaseAddress >= EepromLayout::ReservedBytes)) ? 1 : -1];
 typedef char eepromFitsInDevice[((EepromLayout::BaseAddress + EepromLayout::TotalSize) <= EepromLayout::EepromCapacity) ? 1 : -1];
 typedef char eepromPageSizesFitU08[((EepromLayout::Page1Size | EepromLayout::Page2Size | EepromLayout::Page3Size | EepromLayout::Page4Size | EepromLayout::Page5Size) < 256U) ? 1 : -1];
 typedef char eepromP1TablesEndAtPageEnd[((EepromLayout::P1MosfetTempTable + EepromLayout::P1TableLength) == EepromLayout::Page1Size) ? 1 : -1];
