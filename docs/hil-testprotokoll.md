@@ -148,7 +148,7 @@ Kan kontrolleras i TunerStudio utan laddning (offline-projekt räcker för 10.3.
 | 10.3.2 | Menyraden | Menyerna Charger, Protection, Driver, Calibration och Diagnostics finns. Tools har "Realtime display" (std_realtime). Help har 7 poster tillagda efter TS egna | |
 | 10.3.3 | Help → varje post | Dialogen visar texten. Knappen/länken för hjälp (topicHelp) öppnar help-blocket med radbrytningar (`<br>`) [U] | |
 | 10.3.4 | Hjälpknappen i Charger max values, Auto mode, Stage 1–4, Protection, Sensors, Diagnostics | Rätt help-block öppnas [U: topicHelp mot help-namn är inte dokumenterat i specen] | |
-| 10.3.5 | Framsidan | 8 mätare och 12 indikatorer. Högerklick på en indikator listar de övriga (indicatorTemplate) [U] | |
+| 10.3.5 | Framsidan | 8 mätare och 13 indikatorer (13:e = WarnVoltClamped, BESLUT nr 48). Högerklick på en indikator listar de övriga (indicatorTemplate) [U] | |
 | 10.3.6 | Strömfält, t.ex. Stage 1 current och Manual value för bulk current | Går inte att mata in över 15,00 A | |
 | 10.3.7 | Spänningsfält, t.ex. Stage 1 voltage, och driverVoltMin/driverVoltMax | Över 55,00 V respektive 16,0 V (BESLUT nr 46, tidigare 20,0 V) går inte att mata in | |
 | 10.3.8 | Ladda en .msq eller EEPROM med äldre värden över de nya gränserna (t.ex. 20 A eller 58 V) | Notera hur TS visar och hanterar värdet. Strömvärden ändras inte av firmware. MaxChargeVolt och man_*-spänningar över 55,00 V begränsas till 55,00 V i RAM vid uppstart och vid hel skrivning (BESLUT nr 45), se 10.4.2 [U] | |
@@ -166,6 +166,18 @@ Inget av detta är provat.
 | 10.4.3 | Med kort, dummylast: MaxChargeVolt 55,00 V, mät utspänningen med extern multimeter | Utspänningen går inte över 55 V (ErrOverVoltOut vid ≥ MaxChargeVolt). Kräver att mätkretsen faktiskt når 55 V [U] | |
 | 10.4.4 | Med kort: läs sida 3 efter en .msq med driverVoltMax 20,0 V (BESLUT nr 46) | Läses tillbaka som 16,0 V efter skrivning eller omstart. Fälten är inte aktiva i firmware | |
 | 10.4.5 | Framsidan: Output voltage och Input voltage (BESLUT nr 47) | Output 0–60 V, röd från 55 V. Input 0–70 V, röd från 65 V. Notera hur TS ritar zonen när varning = fara [U] | |
+
+### 10.5 Temperaturskydd inte aktivt, WarnVoltClamped (BESLUT nr 48)
+
+Inget av detta är provat. Laddaren lämnas inte obevakad under provet.
+
+| # | Steg | Förväntat | Resultat |
+|---|---|---|---|
+| 10.5.1 | Auto mode - battery: fältet Temperature compensation | Fältet är gråmarkerat och går inte att ändra (`{ 0 }`) [U]. Värdet "On - NOT ACTIVE, NO EFFECT ..." visas för standardvärdet | |
+| 10.5.2 | Charger max values och Protection: MaxTemp | Etiketten säger "MOSFET Tj max ... not a protection". Hjälptexten säger att 125 °C är Tj-max och inte ett aktivt skydd | |
+| 10.5.3 | Högerklick på en indikator, välj t.ex. "MOSFET over-temp (not active)" | På-texten (visas aldrig, firmware sätter inte biten) slutar med "(NOT ACTIVE)" | |
+| 10.5.4 | Med kort: Battery limits, sätt man_voltLimit (Manuell) under absorptionsspänningen | Framsidans indikator "WARNING: CHARGE VOLTAGE CLAMPED ..." lyser röd. Återställ: indikatorn släcks | |
+
 
 ## Ej testbart i v2.2
 

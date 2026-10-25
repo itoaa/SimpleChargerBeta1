@@ -530,3 +530,23 @@ Olas beslut 2026-10-25 14:14 (via Max). Ersätter CISO:s öppna fråga 3 om mät
 - hiWarning = hiDanger, så ingen gul zon. Det röda börjar exakt vid taket. Hur TS ritar en zon med samma start och slut är inte provat [U]. Lågzonen för inVolt (9/10 V) är oförändrad.
 - Genereras i `tools/ini22_ui.py` (GLIM). Utmätarens röda gräns hämtas ur `HwVoltMaxCv` (nr 45). `test/check_ini_layout.py` kontrollerar skalorna och att den röda gränsen är lika med `HwVoltMaxCv` respektive `MaxInputVolt`-max (65 V).
 - Inte ändrat: `voltSetGauge`, `driverVoltGauge`, de effektiva spänningsmätarna och övriga mätare. Ingen ändring av firmware, layout eller EEPROM.
+
+## 48. Temperaturskydd saknas tills givare finns; WarnVoltClamped på framsidan (2026-10-25)
+Olas beslut 2026-10-25 14:15 (via Max). Ola accepterar uttryckligen att temperaturskydd saknas tills givare finns (etapp 6). Kylning och `totalMaxTime` är det enda skyddet, och laddaren lämnas inte obevakad.
+
+**125 °C** (`MaxTemp`, ini-max 125) anges som Tj-max, alltså MOSFET-gränsen. Det är INTE ett aktivt skydd: firmware läser ingen temperatur och stoppar inte på temperatur.
+
+**ini (genereras av tools/ini22_ui.py), ändrade poster:**
+- `tempCompEnable` (bits, sida 5): alternativ 1 heter "On - NOT ACTIVE, NO EFFECT (no battery temp sensor)" (tidigare "On (needs battery temp sensor, not active)"). Standardvärdet är fortfarande 1 (eepromDefaults oförändrad), och `defaultValue` följer med samma position. Dialogfältet i dlgAutoMainSet heter "Temperature compensation (not active, read-only)", har villkoret `{ 0 }` (alltid inaktivt i TS) och följs av en informationsrad om att funktionen saknar effekt.
+- `MaxTemp`: fältet heter "MOSFET Tj max (reference only, not a protection)" i dlgBasic och "MOSFET Tj max (reference only)" i dlgProtection (under "Not active"). Hjälptexten är omskriven: Tj-max 125 °C, inte ett aktivt skydd, kylning och total laddtid är enda skyddet, lämna inte laddaren obevakad.
+- safetyHelp: samma två stycken tillagda.
+- Indikatorer (indicatorTemplate) vars av-text är märkt "(not active)" har nu också "(NOT ACTIVE)" i på-texten: statusBits 8 (derating), restrictionBits 2/4/8/16/128 och errorBits 8/16/32/64/128/256/1024/2048. Firmware sätter aldrig de bitarna.
+- WarnVoltClamped (autoWarnBits b4): flyttad från indicatorTemplate (gul) till framsidan som 13:e `indicator`, röd, med texten "WARNING: CHARGE VOLTAGE CLAMPED (VOLTAGE LIMIT / MAX CHARGE VOLTAGE)". Av-text "Voltage not clamped". Avviker från nr 44 (12 indikatorer).
+
+**Tester:** `test/check_ini_layout.py` kontrollerar: WarnVoltClamped-indikatorn (bit från autoParams.hpp, röd, etikett), att alla "(not active)"-indikatorer har märkt på-text, tempCompEnable (märkt alternativ, `{ 0 }` i alla dialoger) och MaxTemp-etiketterna. Mutationskontroll: gul färg, fel bit, omärkt på-text, villkoret borttaget, "On" omärkt, gammal MaxTemp-etikett och ändrad WarnVoltClamped i autoParams.hpp fälls alla.
+
+**Inte ändrat:** EEPROM-layout, format, standardvärden, firmware, golden och fältnamn. Mätare, kurvor och dialoger för temperatur var redan märkta "(not active)".
+
+**[U]:**
+- Att TS gråmarkerar ett fält med `{ 0 }`. Det är inte provat i TunerStudio.
+- Att ett befintligt "On" inte går att stänga av i TS när fältet är skrivskyddat. Det har ingen effekt i firmware, men ger autovarning b6 (gul, i högerklicksmenyn).

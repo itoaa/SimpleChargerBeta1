@@ -130,6 +130,23 @@ if g is not None:
     expect('inVoltGauge lo/hi', (0, 70), (int(g[0]), int(g[1])))
     expect('inVoltGauge rod (MaxInputVolt hi)', (ini_hi('MaxInputVolt', 100),) * 2, (int(round(g[4] * 100)), int(round(g[5] * 100))))
 
+# BESLUT nr 48: WarnVoltClamped pa framsidan (rod), inga "(not active)"-funktioner som ser aktiva ut
+aph = dict((m.group(1), int(m.group(2), 16)) for m in re.finditer(
+    r'const\s+uint16_t\s+(Warn\w+)\s*=\s*0x([0-9A-Fa-f]+)U', open(os.path.join(ROOT, 'shared', 'autoParams.hpp')).read()))
+vc = re.findall(r'^\s*indicator\s*=\s*\{ \(autoWarnBits & (\d+)\) > 0 \}\s*,\s*"[^"]*"\s*,\s*"([^"]*)"\s*,\s*\w+\s*,\s*\w+\s*,\s*(\w+)',
+                initext, re.M)
+expect('WarnVoltClamped pa framsidan (bit, rod, etikett)', [(aph.get('WarnVoltClamped'), 'red', True)],
+       [(int(b), bg, 'VOLTAGE CLAMPED' in on) for b, on, bg in vc])
+for kind, expr, off, on in re.findall(r'^\s*(indicator(?:Template)?)\s*=\s*\{([^}]*)\}\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"', initext, re.M):
+    if 'not active' in off.lower():
+        expect('%s {%s} pa-text markerad' % (kind, expr.strip()), True, 'NOT ACTIVE' in on)
+m = re.search(r'^\s*tempCompEnable\s*=\s*bits[^\n]*"Off"\s*,\s*"([^"]*)"', initext, re.M)
+expect('tempCompEnable alternativ 1 markerat inaktivt', True, bool(m) and 'NOT ACTIVE' in m.group(1))
+fl = re.findall(r'^\s*field\s*=\s*"[^"]*"\s*,\s*tempCompEnable\b([^\n]*)$', initext, re.M)
+expect('tempCompEnable skrivskyddat i alla dialoger', True, bool(fl) and all(re.match(r'\s*,\s*\{\s*0\s*\}\s*$', x) for x in fl))
+fl = re.findall(r'^\s*field\s*=\s*"([^"]*)"\s*,\s*MaxTemp\b', initext, re.M)
+expect('MaxTemp markerad som Tj max', True, bool(fl) and all('Tj max' in x for x in fl))
+
 # BESLUT nr 45: autolagets nominella spanningar (autoParams.cpp NomvCount/kCells) mot ini
 apsrc = open(os.path.join(ROOT, 'shared', 'autoParams.cpp')).read()
 nomv_n = int(re.search(r'const\s+uint8_t\s+NomvCount\s*=\s*(\d+)U', apsrc).group(1))

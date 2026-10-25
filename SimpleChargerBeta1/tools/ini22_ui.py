@@ -114,7 +114,7 @@ OPTS = {
                  'Diagnostics: measure only (output off)', 'INVALID'],
     'chargeMode': ['Auto (type + Ah)', 'Manual stage table s1-s4 (not active)',
                    'Simple CC/CV (charger max values)', 'INVALID'],
-    'tempCompEnable': ['Off', 'On (needs battery temp sensor, not active)'],
+    'tempCompEnable': ['Off', 'On - NOT ACTIVE, NO EFFECT (no battery temp sensor)'],   # BESLUT nr 48
     # BESLUT nr 45: index 4..7 ogiltiga
     'batteryNomVolt': ['6 V', '12 V', '24 V', '36 V', 'INVALID', 'INVALID', 'INVALID', 'INVALID'],
     'batteryType': ['Lead flooded starter (SLI)', 'Lead AGM', 'Lead GEL',
@@ -327,13 +327,14 @@ AUTOW = [(1, 'Capacity set', 'AUTO: CAPACITY 0 AH - CHARGING WILL NOT START', 'r
          (2, 'Battery type with auto values', 'AUTO: CUSTOM/INVALID TYPE - ALL MANUAL VALUES USED', 'yellow'),
          (4, 'Bulk current not capped', 'AUTO: C-RATE X AH ABOVE CAP - BULK CURRENT LIMITED', 'yellow'),
          (8, 'No current raised to floor', 'AUTO: TAIL/FLOAT/PRECHARGE CURRENT RAISED TO FLOOR', 'yellow'),
-         (16, 'No voltage clamped', 'AUTO: VOLTAGE LIMITED BY VOLTAGE LIMIT / MAX CHARGE VOLTAGE', 'yellow'),
+         (16, 'Voltage not clamped', 'WARNING: CHARGE VOLTAGE CLAMPED (VOLTAGE LIMIT / MAX CHARGE VOLTAGE)', 'red'),
          (32, 'Nominal voltage valid', 'AUTO: INVALID NOMINAL VOLTAGE', 'red'),
          (64, 'Temp compensation ok', 'AUTO: TEMP COMPENSATION ON BUT NO SENSOR - NOT COMPENSATED', 'yellow'),
          (128, 'Values consistent', 'AUTO: INCONSISTENT VALUES - CHECK FLOAT/ABSORPTION/TAIL/TEMP/RESTART', 'red'),
          (256, 'No manual override', 'AUTO: AT LEAST ONE VALUE IS MANUAL', 'yellow'),
          (512, 'Bulk max time not clamped', 'AUTO: BULK MAX TIME CLAMPED TO 60..1200 MIN', 'yellow'),
          (1024, 'Float time limited', 'AUTO: FLOAT MAX TIME 0 (UNLIMITED) - TOTAL TIME DOES NOT COVER FLOAT', 'yellow')]
+AUTOW_VCLAMP = 16   # autoParams.hpp WarnVoltClamped (kontrolleras i check_ini_layout)
 EEP = [(1, 'EEPROM header ok', 'EEPROM: HEADER INVALID - DEFAULTS LOADED'),
        (2, 'EEPROM page 1 ok', 'EEPROM: CRC ERROR PAGE 1 - DEFAULTS LOADED'),
        (4, 'EEPROM page 2 ok', 'EEPROM: CRC ERROR PAGE 2 - DEFAULTS LOADED'),
@@ -343,8 +344,12 @@ EEP = [(1, 'EEPROM header ok', 'EEPROM: HEADER INVALID - DEFAULTS LOADED'),
        (64, 'Burn ok', 'EEPROM: BURN FAILED'),
        (128, 'EEPROM backend ok', 'EEPROM: NO BACKEND')]
 
+def na_on(off, on):
+    # BESLUT nr 48: en bit som firmware aldrig satter ska inte se aktiv ut, inte ens i pa-lage
+    return on + ' (NOT ACTIVE)' if off.endswith(NA) else on
+
 def frontpage():
-    L = ['   ; BESLUT nr 44: 8 matare och 12 indikatorer pa standardpanelen. Ovriga indikatorer',
+    L = ['   ; BESLUT nr 44, 48: 8 matare och 13 indikatorer pa standardpanelen. Ovriga indikatorer',
          '   ; ar indicatorTemplate (hogerklicksmenyn, spec kap. 16). Rod bakgrund = fel/varning.',
          '   gauge1 = outVoltGauge', '   gauge2 = outAmpGauge', '   gauge3 = outPowerGauge',
          '   gauge4 = voltSetGauge', '   gauge5 = inVoltGauge', '   gauge6 = driverVoltGauge',
@@ -363,17 +368,21 @@ def frontpage():
          ind('anyError', 'No error', 'ERROR - SEE INDICATORS', 'red'),
          ind('mcvOutputOff', 'Max charge voltage set', 'OUTPUT OFF: MAX CHARGE VOLTAGE = 0', 'red'),
          ind('eepromWarnBits > 0', 'EEPROM ok', 'EEPROM WARNING - SEE INDICATORS', 'red'),
+         '   ; BESLUT nr 48: WarnVoltClamped (autoWarnBits b4) syns pa framsidan, rod.',
+         ind('(autoWarnBits & %d) > 0' % AUTOW_VCLAMP, 'Voltage not clamped', 'WARNING: CHARGE VOLTAGE CLAMPED (VOLTAGE LIMIT / MAX CHARGE VOLTAGE)', 'red'),
          '',
          '   ; --- indicatorTemplate: valbara via hogerklick ---']
     for bit, off, on, bg in STATUS_T:
-        L.append(ind('statusBits & %d' % bit, off, on, bg, True))
+        L.append(ind('statusBits & %d' % bit, off, na_on(off, on), bg, True))
     L.append(ind('(chargerState == 3) && (chargeMode == 2)', 'Simple CC/CV', 'Simple CC/CV charging', 'green', True))
     for bit, off, on in RESTR:
-        L.append(ind('restrictionBits & %d' % bit, off, on, 'yellow', True))
+        L.append(ind('restrictionBits & %d' % bit, off, na_on(off, on), 'yellow', True))
     for bit, off, on in ERR:
-        L.append(ind('errorBits & %d' % bit, off, on, 'red', True))
+        L.append(ind('errorBits & %d' % bit, off, na_on(off, on), 'red', True))
     L.append(ind('anyLatched', 'No stored errors', 'STORED ERRORS - SEE DIAGNOSTICS', 'red', True))
     for bit, off, on, bg in AUTOW:
+        if bit == AUTOW_VCLAMP:
+            continue   # pa framsidan (BESLUT nr 48)
         L.append(ind('(autoWarnBits & %d) > 0' % bit, off, on, bg, True))
     for bit, off, on in EEP:
         L.append(ind('eepromWarnBits & %d' % bit, off, on, 'red', True))
@@ -386,7 +395,8 @@ HELP = [
  ('safetyHelp', 'Safety', [
   'The hardware limit is 15 A. All current fields are limited to 0-15 A and the firmware limits every effective current to 15 A.',
   'Max charge voltage = 0 means that the output is always off. This is the factory default. Set Max charge voltage before charging.',
-  'There are no temperature sensors in this firmware. All temperature protection is marked (not active) and does not protect the battery or the MOSFETs.',
+  'There are no temperature sensors in this firmware. All temperature protection is marked (not active) and does not protect the battery or the MOSFETs. 125 ' + DC + ' (Max MOSFET temp) is the MOSFET junction limit Tj max, not an active protection.',
+  'Until temperature sensors exist, cooling and the total max charge time (totalMaxTime) are the only protection. Do not leave the charger unattended.',
   'Check all voltages, currents and times against the battery data sheet before charging.',
   'Burn is rejected while charging. Stop charging first, then burn.']),
  ('accelerationDelayHelp', 'Soft start (acceleration delay)', [
@@ -497,7 +507,7 @@ def userdefined():
           '   field = "Min input voltage (not active)", minInputVolt',
           '   field = "Max PWM", MaxPWM',
           '   field = "Min PWM", MinPWM',
-          '   field = "Max MOSFET temp (not active)", MaxTemp',
+          '   field = "MOSFET Tj max (reference only, not a protection)", MaxTemp',
           '   field = "Soft start per PWM step (not active)", accelerationDelay',
           '   field = "!Max charge voltage = 0 keeps the output off."',
           '']
@@ -526,7 +536,8 @@ def userdefined():
           '   field = "Battery type", batteryType',
           '   field = "Nominal voltage", batteryNomVolt',
           '   field = "Capacity (C20)", capacityAh',
-          '   field = "Temperature compensation (not active)", tempCompEnable',
+          '   field = "Temperature compensation (not active, read-only)", tempCompEnable, { 0 }',   # BESLUT nr 48: skrivskyddat
+          '   field = "#Temperature compensation has no effect: there is no battery temp sensor."',
           '   field = "Current cap in Auto", autoAmpCap, { chargeMode == 0 }',
           '   field = "Floor for tail/float/precharge current", tailAmpFloor, { chargeMode == 0 }',
           '   field = "#Custom = no auto values, all manual values are used."',
@@ -580,7 +591,7 @@ def userdefined():
           '   topicHelp = protectionHelp',
           '   field = "Max input voltage (0 = off)", MaxInputVolt',
           '   field = "!Not active in this firmware (stored only):"',
-          '   field = "Max MOSFET temp", MaxTemp',
+          '   field = "MOSFET Tj max (reference only)", MaxTemp',
           '   field = "Derating starts at", derateStartTemp',
           '   field = "Temperature hysteresis", tempHyst',
           '   field = "Min input voltage", minInputVolt',
@@ -720,7 +731,7 @@ def ctx():
      ('MaxInputAmp', 'Max input current. Not active: needs an input current sensor and is not used by the firmware yet.'),
      ('MaxPWM', 'Highest PWM duty step (0-25).'),
      ('MinPWM', 'Lowest PWM duty step when the output is on.'),
-     ('MaxTemp', 'MOSFET temperature stop. Not active: there is no temperature sensor.'),
+     ('MaxTemp', 'MOSFET junction temperature limit Tj max (125 ' + DC + ' = MOSFET limit). Reference value only, NOT an active protection: there is no temperature sensor. Cooling and the total max charge time are the only protection; do not leave the charger unattended.'),
      ('accelerationDelay', 'Soft start delay per PWM step. Not active: stored but not used yet.'),
      ('mosfetTempADCTable', 'MOSFET temp curve, x axis: ADC value divided by 4. Not active.'),
      ('mosfetTempTable', 'MOSFET temp curve, y axis: temperature for each ADC point. Not active.'),
