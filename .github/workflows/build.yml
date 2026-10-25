@@ -8,6 +8,15 @@ permissions:
   contents: write
 
 jobs:
+  host-tests:
+    # Vardtester for EEPROM-modulen (TunerStudio v2.2). Bygger inte firmware och committar inget.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run host tests
+        run: make -C SimpleChargerBeta1/test test
+
   avr:
     runs-on: ubuntu-latest
     defaults:
