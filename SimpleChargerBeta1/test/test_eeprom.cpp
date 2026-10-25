@@ -14,8 +14,10 @@ static int g_fails = 0;
     printf("FEL %s:%d: %s\n", __FILE__, __LINE__, #cond); } } while (0)
 
 /* ---- Mock-EEPROM ------------------------------------------------------ */
+struct MockGuard;
 struct MockEeprom
 {
+    MockGuard* guard;       /* for kontroll att utgangen ar av vid skrivning */
     uint8_t mem[EepromLayout::EepromCapacity];
     unsigned updateCalls;   /* antal anrop till update */
     unsigned bytesWritten;  /* byte som faktiskt andrades (som eeprom_update_*) */
@@ -31,8 +33,11 @@ struct MockEeprom
         writeBudget = 0xFFFFFFFFU;
         ignoreWrites = false;
         outOfRange = false;
+        guard = 0;
     }
 };
+
+static void noteWrite(MockGuard* g);
 
 static void mockRead(uint16_t address, uint8_t* dst, uint16_t len, void* ctx)
 {
@@ -45,6 +50,7 @@ static void mockUpdate(uint16_t address, const uint8_t* src, uint16_t len, void*
 {
     MockEeprom* m = static_cast<MockEeprom*>(ctx);
     ++m->updateCalls;
+    noteWrite(m->guard);
     if (((uint32_t)address + len) > EepromLayout::EepromCapacity) { m->outOfRange = true; return; }
     for (uint16_t i = 0U; i < len; ++i)
     {
@@ -85,6 +91,74 @@ static bool allDefaults(const EepromStore& s)
         if (!ramEqualsDefaults(s, p)) { return false; }
     }
     return true;
+}
+
+/* ---- Mock for BurnGuard (beslut 2) ------------------------------------ */
+struct MockGuard
+{
+    bool charging;          /* vad chargingActive svarar */
+    bool outputOn;          /* simulerad utgang */
+    unsigned chargingCalls;
+    unsigned offCalls;
+    unsigned restoreCalls;
+    unsigned writesWhenOff;    /* updateCalls nar outputOff anropades */
+    unsigned writesAtRestore;  /* updateCalls nar outputRestore anropades */
+    bool outputOnDuringWrite;  /* satt om nagon skrivning skedde med utgangen pa */
+
+    void reset()
+    {
+        charging = false; outputOn = true;
+        chargingCalls = 0U; offCalls = 0U; restoreCalls = 0U;
+        writesWhenOff = 0U; writesAtRestore = 0U; outputOnDuringWrite = false;
+    }
+};
+
+static MockGuard g_guard;
+
+static bool guardCharging(void* ctx)
+{
+    MockGuard* g = static_cast<MockGuard*>(ctx);
+    ++g->chargingCalls;
+    return g->charging;
+}
+
+static void guardOff(void* ctx)
+{
+    MockGuard* g = static_cast<MockGuard*>(ctx);
+    ++g->offCalls;
+    g->outputOn = false;
+    g->writesWhenOff = g_mock.updateCalls;
+}
+
+static void guardRestore(void* ctx)
+{
+    MockGuard* g = static_cast<MockGuard*>(ctx);
+    ++g->restoreCalls;
+    g->outputOn = true;
+    g->writesAtRestore = g_mock.updateCalls;
+}
+
+static BurnGuard mockGuard()
+{
+    BurnGuard b;
+    b.chargingActive = &guardCharging;
+    b.outputOff = &guardOff;
+    b.outputRestore = &guardRestore;
+    b.ctx = &g_guard;
+    return b;
+}
+
+/* burn med en tillatande guard (ingen laddning) - for tester av lagringen. */
+static void noteWrite(MockGuard* g)
+{
+    if ((g != 0) && g->outputOn) { g->outputOnDuringWrite = true; }
+}
+
+static EepromStore::BurnResult doBurn(EepromStore& s)
+{
+    g_guard.reset();
+    s.setBurnGuard(mockGuard());
+    return s.burn();
 }
 
 /* Satter igenkannbara icke-standardvarden pa alla sidor. */
@@ -268,7 +342,7 @@ static void testRoundTrip()
     EepromStore a(mockBackend());
     fillPattern(a);
     a.page(2)[EepromLayout::P3DiagModeOffset] = 0x00U;
-    CHECK(a.burn());
+    CHECK(doBurn(a) == EepromStore::BurnOk);
     CHECK(a.warnBits() == 0U);
     CHECK(g_mock.bytesWritten > 0U);
     CHECK(!g_mock.outOfRange);
@@ -296,7 +370,7 @@ static void testReservedArea()
         memcpy(before, g_mock.mem, sizeof(before));
         EepromStore a(mockBackend());
         fillPattern(a);
-        CHECK(a.burn());
+        CHECK(doBurn(a) == EepromStore::BurnOk);
         CHECK(memcmp(before, g_mock.mem, sizeof(before)) == 0);
         /* Skrap i 0..15 (t.ex. B-2-data eller brownout-korruption av adress 0) */
         for (uint16_t i = 0U; i < EepromLayout::ReservedBytes; ++i) { g_mock.mem[i] = (uint8_t)(0x5AU ^ i); }
@@ -317,7 +391,7 @@ static void testCorruptPage()
         EepromStore a(mockBackend());
         fillPattern(a);
         a.page(2)[EepromLayout::P3DiagModeOffset] = 0x00U;
-        CHECK(a.burn());
+        CHECK(doBurn(a) == EepromStore::BurnOk);
         /* Vant en bit i sidans data */
         g_mock.mem[EepromLayout::pageAddress(bad) + 3U] ^= 0x01U;
         EepromStore b(mockBackend());
@@ -335,7 +409,7 @@ static void testCorruptPage()
     g_mock.reset(0xFFU);
     EepromStore a(mockBackend());
     fillPattern(a);
-    CHECK(a.burn());
+    CHECK(doBurn(a) == EepromStore::BurnOk);
     g_mock.mem[EepromLayout::pageAddress(4) + EepromLayout::Page5Size] ^= 0x80U;
     EepromStore b(mockBackend());
     CHECK(b.load() == EepromStore::WarnPage5Crc);
@@ -350,7 +424,7 @@ static void testHeader()
         g_mock.reset(0xFFU);
         EepromStore a(mockBackend());
         fillPattern(a);
-        CHECK(a.burn());
+        CHECK(doBurn(a) == EepromStore::BurnOk);
         g_mock.mem[EepromLayout::BaseAddress + offs[i]] ^= 0x01U;  /* magic, version, antal */
         EepromStore b(mockBackend());
         CHECK(b.load() == EepromStore::WarnHeaderInvalid);
@@ -359,7 +433,7 @@ static void testHeader()
     /* Annan layoutversion med korrekt huvud-CRC -> standardvarden */
     g_mock.reset(0xFFU);
     EepromStore a(mockBackend());
-    CHECK(a.burn());
+    CHECK(doBurn(a) == EepromStore::BurnOk);
     uint8_t* hdr = &g_mock.mem[EepromLayout::BaseAddress];
     hdr[2] = (uint8_t)(EepromLayout::LayoutVersion + 1U);
     scPutU16le(&hdr[4], crc16(hdr, 4U));
@@ -374,7 +448,7 @@ static void testDiagMode()
     EepromStore a(mockBackend());
     a.page(2)[EepromLayout::P3DiagModeOffset] = 0xF1U;   /* diag 1 + ovriga bitar */
     a.page(2)[17] = 12U;
-    CHECK(a.burn());
+    CHECK(doBurn(a) == EepromStore::BurnOk);
     CHECK(a.page(2)[EepromLayout::P3DiagModeOffset] == 0xF1U);  /* RAM orord */
     CHECK(g_mock.mem[EepromLayout::Page3Address + 16U] == 0xF0U);
     CHECK(g_mock.mem[EepromLayout::Page3Address + 17U] == 12U);
@@ -408,17 +482,17 @@ static void testWritesOnlyOnBurn()
     CHECK(g_mock.updateCalls == 0U);
     CHECK(g_mock.bytesWritten == 0U);
 
-    CHECK(s.burn());
+    CHECK(doBurn(s) == EepromStore::BurnOk);
     CHECK(g_mock.bytesWritten > 0U);
     CHECK(g_mock.bytesWritten <= EepromLayout::TotalSize);
     /* Andra burn utan andringar: inga byte andras (update-semantik) */
     g_mock.bytesWritten = 0U;
-    CHECK(s.burn());
+    CHECK(doBurn(s) == EepromStore::BurnOk);
     CHECK(g_mock.bytesWritten == 0U);
     /* En andrad byte -> den byten + sidans CRC (max 3 byte) */
     v = 9U;
     CHECK(s.writeBytes(0, EepromLayout::P1MaxPWM, &v, 1U));
-    CHECK(s.burn());
+    CHECK(doBurn(s) == EepromStore::BurnOk);
     CHECK(g_mock.bytesWritten >= 1U && g_mock.bytesWritten <= 3U);
     CHECK(!g_mock.outOfRange);
 }
@@ -463,7 +537,7 @@ static void testFailures()
     g_mock.reset(0xFFU);
     g_mock.ignoreWrites = true;
     EepromStore s(mockBackend());
-    CHECK(!s.burn());
+    CHECK(doBurn(s) == EepromStore::BurnErrorVerify);
     CHECK((s.warnBits() & EepromStore::WarnBurnFailed) != 0U);
 
     /* Ingen backend */
@@ -471,7 +545,8 @@ static void testFailures()
     EepromStore n(none);
     CHECK(n.load() == (EepromStore::WarnNoBackend | EepromStore::WarnHeaderInvalid));
     CHECK(allDefaults(n));
-    CHECK(!n.burn());
+    CHECK(doBurn(n) == EepromStore::BurnErrorNoBackend);
+    CHECK((n.warnBits() & EepromStore::WarnBurnFailed) != 0U);
 
     /* Stromavbrott under forsta burn: huvudet skrivs sist -> standardvarden */
     for (unsigned budget = 0U; budget < 320U; budget += 7U)
@@ -480,7 +555,7 @@ static void testFailures()
         EepromStore a(mockBackend());
         fillPattern(a);
         g_mock.writeBudget = budget;
-        (void)a.burn();
+        (void)doBurn(a);
         g_mock.writeBudget = 0xFFFFFFFFU;
         EepromStore b(mockBackend());
         const uint8_t w = b.load();
@@ -495,14 +570,102 @@ static void testFailures()
     /* Stromavbrott nar giltigt innehall redan finns: berord sida -> standard + varning */
     g_mock.reset(0xFFU);
     EepromStore a(mockBackend());
-    CHECK(a.burn());                                  /* giltiga standardvarden */
+    CHECK(doBurn(a) == EepromStore::BurnOk);                                  /* giltiga standardvarden */
     fillPattern(a);
     g_mock.writeBudget = 10U;                         /* hinner bara en del av sida 1 */
-    (void)a.burn();
+    (void)doBurn(a);
     g_mock.writeBudget = 0xFFFFFFFFU;
     EepromStore b(mockBackend());
     CHECK(b.load() == EepromStore::WarnPage1Crc);
     CHECK(ramEqualsDefaults(b, 0));
+}
+
+/* Beslut 2: B avvisas under laddning, utgangen av under skrivning. */
+static void testBurnGuard()
+{
+    /* Utan guard: avvisas, inget skrivs, varningar orords */
+    g_mock.reset(0xFFU);
+    EepromStore s(mockBackend());
+    (void)s.load();
+    const uint8_t w0 = s.warnBits();
+    CHECK(w0 == EepromStore::WarnHeaderInvalid);
+    CHECK(s.burn() == EepromStore::BurnRejectedNoGuard);
+    CHECK(g_mock.updateCalls == 0U);
+    CHECK(s.warnBits() == w0);
+
+    /* Guard med saknad chargingActive eller outputOff raknas som ingen guard */
+    BurnGuard half = mockGuard();
+    half.chargingActive = 0;
+    g_guard.reset();
+    s.setBurnGuard(half);
+    CHECK(s.burn() == EepromStore::BurnRejectedNoGuard);
+    half = mockGuard();
+    half.outputOff = 0;
+    s.setBurnGuard(half);
+    CHECK(s.burn() == EepromStore::BurnRejectedNoGuard);
+    CHECK(g_guard.chargingCalls == 0U && g_guard.offCalls == 0U && g_guard.restoreCalls == 0U);
+    CHECK(g_mock.updateCalls == 0U);
+
+    /* Laddning pagar: avvisas, utgangen rors inte, inget skrivs */
+    g_guard.reset();
+    g_guard.charging = true;
+    s.setBurnGuard(mockGuard());
+    CHECK(s.burn() == EepromStore::BurnRejectedCharging);
+    CHECK(g_guard.chargingCalls == 1U);
+    CHECK(g_guard.offCalls == 0U && g_guard.restoreCalls == 0U && g_guard.outputOn);
+    CHECK(g_mock.updateCalls == 0U && g_mock.bytesWritten == 0U);
+    CHECK(s.warnBits() == w0);
+
+    /* Ingen laddning: av -> skriv -> aterstall, i den ordningen */
+    g_guard.reset();
+    g_mock.guard = &g_guard;
+    s.setBurnGuard(mockGuard());
+    CHECK(s.burn() == EepromStore::BurnOk);
+    CHECK(g_guard.chargingCalls == 1U && g_guard.offCalls == 1U && g_guard.restoreCalls == 1U);
+    CHECK(g_guard.writesWhenOff == 0U);                       /* av fore forsta skrivning */
+    CHECK(g_guard.writesAtRestore == g_mock.updateCalls);     /* pa efter sista skrivning */
+    CHECK(g_mock.updateCalls > 0U);
+    CHECK(!g_guard.outputOnDuringWrite);
+    CHECK(g_guard.outputOn);
+    CHECK(s.warnBits() == 0U);                                /* beslut 5 */
+
+    /* Verifieringsfel: utgangen aterstalls anda, BurnErrorVerify */
+    g_mock.reset(0xFFU);
+    g_mock.ignoreWrites = true;
+    g_guard.reset();
+    g_mock.guard = &g_guard;
+    EepromStore f(mockBackend());
+    f.setBurnGuard(mockGuard());
+    CHECK(f.burn() == EepromStore::BurnErrorVerify);
+    CHECK(g_guard.offCalls == 1U && g_guard.restoreCalls == 1U && g_guard.outputOn);
+    CHECK(!g_guard.outputOnDuringWrite);
+    CHECK((f.warnBits() & EepromStore::WarnBurnFailed) != 0U);
+
+    /* outputRestore = 0 ar tillatet (utgangen lamnas av) */
+    g_mock.reset(0xFFU);
+    g_guard.reset();
+    BurnGuard noRestore = mockGuard();
+    noRestore.outputRestore = 0;
+    EepromStore r(mockBackend());
+    r.setBurnGuard(noRestore);
+    CHECK(r.burn() == EepromStore::BurnOk);
+    CHECK(g_guard.offCalls == 1U && g_guard.restoreCalls == 0U && !g_guard.outputOn);
+
+    /* Ingen backend gar fore guard: inga krokar anropas */
+    EepromBackend none; none.read = 0; none.update = 0; none.ctx = 0;
+    EepromStore n(none);
+    g_guard.reset();
+    n.setBurnGuard(mockGuard());
+    CHECK(n.burn() == EepromStore::BurnErrorNoBackend);
+    CHECK(g_guard.chargingCalls == 0U && g_guard.offCalls == 0U);
+    g_mock.reset(0xFFU);
+}
+
+static void testRealtimeConstants()
+{
+    CHECK(EepromRealtime::BlockSizeV22 == 114U);
+    CHECK(EepromRealtime::WarnBitsOffset == EepromRealtime::BlockSizeV22);
+    CHECK(EepromRealtime::BlockSizeProposed == 115U);
 }
 
 int main()
@@ -521,6 +684,8 @@ int main()
     testWritesOnlyOnBurn();
     testBounds();
     testFailures();
+    testBurnGuard();
+    testRealtimeConstants();
     printf("%d kontroller, %d fel\n", g_checks, g_fails);
     return (g_fails == 0) ? 0 : 1;
 }

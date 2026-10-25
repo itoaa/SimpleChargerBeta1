@@ -46,12 +46,26 @@ const uint8_t DiagPageIndex = 2U; /* sida 3 */
 EepromStore::EepromStore(const EepromBackend& backend)
     : backend_(backend), warn_(0U)
 {
+    guard_.chargingActive = 0;
+    guard_.outputOff = 0;
+    guard_.outputRestore = 0;
+    guard_.ctx = 0;
     loadDefaults();
+}
+
+void EepromStore::setBurnGuard(const BurnGuard& guard)
+{
+    guard_ = guard;
 }
 
 bool EepromStore::backendOk() const
 {
     return (backend_.read != 0) && (backend_.update != 0);
+}
+
+bool EepromStore::guardOk() const
+{
+    return (guard_.chargingActive != 0) && (guard_.outputOff != 0);
 }
 
 void EepromStore::loadDefaults()
@@ -154,13 +168,36 @@ uint16_t EepromStore::storedCrc(uint8_t index) const
     return crc;
 }
 
-bool EepromStore::burn()
+EepromStore::BurnResult EepromStore::burn()
 {
     if (!backendOk())
     {
         warn_ = (uint8_t)(warn_ | WarnNoBackend | WarnBurnFailed);
-        return false;
+        return BurnErrorNoBackend;
     }
+    if (!guardOk())
+    {
+        return BurnRejectedNoGuard;
+    }
+    if (guard_.chargingActive(guard_.ctx))
+    {
+        return BurnRejectedCharging;
+    }
+
+    guard_.outputOff(guard_.ctx);
+    const bool ok = writeAndVerify();
+    if (guard_.outputRestore != 0)
+    {
+        guard_.outputRestore(guard_.ctx);
+    }
+
+    /* Efter lyckad burn stammer EEPROM med RAM: gamla lastvarningar nollas. */
+    warn_ = ok ? 0U : (uint8_t)(warn_ | WarnBurnFailed);
+    return ok ? BurnOk : BurnErrorVerify;
+}
+
+bool EepromStore::writeAndVerify()
+{
 
     /* 1) Sidorna (data + CRC). update skriver bara andrade byte. */
     for (uint8_t p = 0U; p < EepromLayout::PageCount; ++p)
@@ -214,8 +251,6 @@ bool EepromStore::burn()
         ok = (crc == scGetU16le(crcBytes)) && (crc == storedCrc(p));
     }
 
-    /* Efter lyckad burn stammer EEPROM med RAM: gamla lastvarningar nollas. */
-    warn_ = ok ? 0U : (uint8_t)(warn_ | WarnBurnFailed);
     return ok;
 }
 

@@ -8,6 +8,8 @@
  *    standardvarden + varningsbit. diagMode tvingas till Normal. Skriver ALDRIG.
  *  - burn(): ENDA vagen till EEPROM-skrivning (TunerStudio "B"). Anvander
  *    backendens update (skriver bara andrade byte). Huvudet skrivs sist.
+ *    Kraver en BurnGuard (beslut 2): avvisas om laddning pagar, annars
+ *    stangs utgangen fore skrivningen och aterstalls efter.
  *  - Ingen heap, ingen STL, inga virtuella funktioner.
  *
  * Hardvaran abstraheras med EepromBackend (funktionspekare) sa att logiken
@@ -30,6 +32,30 @@ struct EepromBackend
     void* ctx;
 };
 
+/* Villkor och krokar for burn (beslut 2, 2026-10-25).
+ * Firmware kopplar in dessa nar modulen kopplas in med v2.2-protokollet. */
+struct BurnGuard
+{
+    /* true = laddning pagar -> burn avvisas utan att nagot skrivs. Kravs. */
+    bool (*chargingActive)(void* ctx);
+    /* Stang utgangen (duty 0) innan EEPROM skrivs. Kravs. */
+    void (*outputOff)(void* ctx);
+    /* Aterstall utgangen efter skrivningen (anropas alltid efter outputOff,
+     * aven om verifieringen misslyckas). Far vara 0. */
+    void (*outputRestore)(void* ctx);
+    void* ctx;
+};
+
+/* Realtidsdata: forslag till ny statusbyte for EEPROM-varningarna (beslut 4).
+ * Laggs efter 114 B-blocket i SPEC_tabeller_v2.2.md (offset 0..113 ar fullt
+ * belagda), dvs ochBlockSize 114 -> 115. Bitarna = EepromStore::warnBits().
+ * Endast konstanter: protokollet/ini andras inte i denna version. */
+namespace EepromRealtime {
+const uint16_t BlockSizeV22     = 114U;  /* nuvarande ochBlockSize i v2.2 */
+const uint16_t WarnBitsOffset   = 114U;  /* eepromWarnBits, U08 */
+const uint16_t BlockSizeProposed = 115U;
+}
+
 /* Standardvarden for alla sidor i foljd (292 B). Ligger i flash pa AVR. */
 extern const uint8_t eepromDefaults[EepromLayout::PagesTotalSize] SC_PROGMEM;
 
@@ -49,7 +75,21 @@ public:
         WarnNoBackend     = 0x80U  /* backend saknar read/update */
     };
 
+    /* Resultat av burn(). */
+    enum BurnResult
+    {
+        BurnOk               = 0, /* skrivet och verifierat */
+        BurnRejectedCharging = 1, /* laddning pagar: inget skrivet, utgang orord */
+        BurnRejectedNoGuard  = 2, /* ingen BurnGuard satt: inget skrivet (sakert standardlage) */
+        BurnErrorNoBackend   = 3, /* backend saknas: inget skrivet */
+        BurnErrorVerify      = 4  /* skrivet men aterlasningen stammer inte */
+    };
+
     explicit EepromStore(const EepromBackend& backend);
+
+    /* Satt villkor/krokar for burn. Utan guard (eller med chargingActive
+     * eller outputOff = 0) avvisas burn med BurnRejectedNoGuard. */
+    void setBurnGuard(const BurnGuard& guard);
 
     /* Fyll RAM-kopian med standardvarden. Skriver inte EEPROM. */
     void loadDefaults();
@@ -58,8 +98,11 @@ public:
     uint8_t load();
 
     /* Spara alla sidor + huvud till EEPROM och verifiera genom aterlasning.
-     * diagMode sparas alltid som Normal. Returnerar true om verifieringen gick bra. */
-    bool burn();
+     * diagMode sparas alltid som Normal. Ordning: backend -> guard ->
+     * chargingActive (avvisa) -> outputOff -> skriv + verifiera -> outputRestore.
+     * Vid avvisning andras varken EEPROM, utgang eller varningsbitar.
+     * Lyckad burn nollar varningsbitarna (beslut 5). */
+    BurnResult burn();
 
     uint8_t warnBits() const { return warn_; }
 
@@ -78,6 +121,8 @@ private:
     EepromStore& operator=(const EepromStore&);
 
     bool backendOk() const;
+    bool guardOk() const;
+    bool writeAndVerify();
     bool headerValid() const;
     bool loadPage(uint8_t index);
     void defaultsForPage(uint8_t index);
@@ -87,6 +132,7 @@ private:
     bool rangeOk(uint8_t index, uint16_t offset, uint16_t len) const;
 
     EepromBackend backend_;
+    BurnGuard guard_;
     uint8_t data_[EepromLayout::PagesTotalSize];
     uint8_t warn_;
 };
