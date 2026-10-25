@@ -177,7 +177,7 @@ def validate(path,exp_sig=None,exp_och=None,exp_pages=None,eeprom=1024):
         elif k=='help' and cur_dialog and False: pass
     for i,k,v in secs.get('Menu',[]):
         a=split_args(v) if v else []
-        if k=='subMenu' and a[0] not in targets: E.append(f'rad {i}: subMenu "{a[0]}" pekar inte pa dialog/kurva/tabell')
+        if k=='subMenu' and a[0] not in targets|helps: E.append(f'rad {i}: subMenu "{a[0]}" pekar inte pa dialog/kurva/tabell/help')  # BESLUT nr 50: help-namn tillatet (spec 15.3.3)
         for x in a[1:]:
             if x.startswith('{'): chk(x,f'rad {i} menyvillkor')
     for sec,arrk in (('CurveEditor',('xBins','yBins')),('TableEditor',('xBins','yBins','zBins'))):
@@ -234,8 +234,8 @@ def validate(path,exp_sig=None,exp_och=None,exp_pages=None,eeprom=1024):
     ovr=[n[4:] for n in cmap if n.startswith('ovr_')]
     for X in ovr:
         o_=cmap['ovr_'+X]
-        if o_['kind']!='bits' or [x.strip('"') for x in o_['options']]!=['Auto','Manuell']:
-            E.append(f'ovr_{X}: ska vara bits med alternativen "Auto","Manuell"')
+        if o_['kind']!='bits' or [x.strip('"') for x in o_['options']]!=['Auto','Manual']:  # BESLUT nr 50: Manual (var Manuell)
+            E.append(f'ovr_{X}: ska vara bits med alternativen "Auto","Manual"')
         m=cmap.get('man_'+X); e=omap.get('eff_'+X); pa=omap.get('pa_'+X)
         if m is None: E.append(f'ovr_{X}: man_{X} saknas i Constants')
         if e is None or e['kind']=='formula': E.append(f'ovr_{X}: effektivt varde eff_{X} saknas i OutputChannels (firmware-kanal)')

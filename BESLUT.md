@@ -561,3 +561,32 @@ Olas beslut 2026-10-25 14:42 (via Max): mätaren "Driver voltage" på framsidan 
 - Zoner: röd från 16 V, som är fältets max (`HwDriverVoltMaxDv`, hämtas av generatorn). Gul 15–16 V. Lågzonen (röd under 10 V, gul 10–11 V) är oförändrad. Zonerna fanns redan; bara skalans max ändras från 20 till 18 V. Zongränserna är presentation och bygger inte på någon firmwarekontroll: driverVolt-fälten är inte aktiva (nr 46), och drivstegets verkliga tålighet är inte kontrollerad mot datablad [U].
 - Genereras i `tools/ini22_ui.py` (GLIM). `test/check_ini_layout.py` kontrollerar skalan 0–18, att den röda gränsen är lika med `HwDriverVoltMaxDv`, att gul ligger under röd, lågzonen 10/11 V, och att `HwDriverVoltMaxDv` = 160 och `driverVoltMax`-max i ini = 16 V. Mutationskontroll: hi 20, hiDanger 17, hiWarning 16 och 17, loDanger 9, lo 1, fältmax 18, borttagen mätare och `HwDriverVoltMaxDv` 180 fälls alla.
 - Ingen ändring av firmware, layout, EEPROM, standardvärden eller golden.
+
+## 50. Validatorn godtar Help → help-namn och "Manual"; Help-menyn pekar direkt på hjälptexterna (2026-10-25)
+Olas beslut 2026-10-25 14:48 (via Max), öppen fråga 2 om validatorn. Ersätter avvikelsen om `dlgHelp_*` i nr 44.
+
+**Spec:** ecudef.txt avsnitt 15.3.3 (Plain Text help): "Plain text help can be defined in this section, then accessed by name from a [Menu]." EFI:s egna exempel-ini gör samma sak (`subMenu = helpGeneral, "MS3 Info"` i MS3-exemplet och `subMenu = helpGeneral, "&MS-II Info"` i MSII BG 2.905). Avsnitt 14.2.3 nämner bara "targetDialog" [U: att TS öppnar ett help-block som subMenu-mål är inte provat här].
+
+**Validatorn (`SimpleChargerBeta1/test/ref/validate_ini_v2.2.py`), hela diffen:**
+```diff
+@@ -180 +180 @@
+-        if k=='subMenu' and a[0] not in targets: E.append(f'rad {i}: subMenu "{a[0]}" pekar inte pa dialog/kurva/tabell')
++        if k=='subMenu' and a[0] not in targets|helps: E.append(f'rad {i}: subMenu "{a[0]}" pekar inte pa dialog/kurva/tabell/help')  # BESLUT nr 50: help-namn tillatet (spec 15.3.3)
+@@ -237,2 +237,2 @@
+-        if o_['kind']!='bits' or [x.strip('"') for x in o_['options']]!=['Auto','Manuell']:
+-            E.append(f'ovr_{X}: ska vara bits med alternativen "Auto","Manuell"')
++        if o_['kind']!='bits' or [x.strip('"') for x in o_['options']]!=['Auto','Manual']:  # BESLUT nr 50: Manual (var Manuell)
++            E.append(f'ovr_{X}: ska vara bits med alternativen "Auto","Manual"')
+```
+- (a) Bara `subMenu` får peka på ett `help`-namn (från [UserDefined]). `panel`, `topicHelp` och övriga referenser är oförändrade.
+- (b) ovr_* kräver nu exakt "Auto","Manual". "Manuell" fälls, så källfilen från Drive (SmedbyCharger_v2.2.ini, med "Manuell") skulle inte längre passera den här kontrollen. Validatorn körs bara på den genererade `tunerStudio_v2.2.ini`.
+- Inga andra kontroller är ändrade: intervall, enheter, layout och offset, mätare, menymål, alternativ, defaultValue och autoläget är som förut.
+
+**Generatorn (`tools/ini22_ui.py`):**
+- Help-menyn: `subMenu = safetyHelp, "Safety"` osv. för de 7 help-blocken. Dialogerna `dlgHelp_*` (texten som fältrader) är borttagna, liksom hjälpfunktionerna `help_dialogs()` och `wrap()`.
+- ovr_* (21 st): alternativen "Auto","Manual" (källfilen har "Manuell"). Kommentarerna ovanför ovr_*/man_* och hjälptexterna (autoHelp, SettingContextHelp för ovr_*/man_*) säger nu Manual.
+- Bara texten ändras. Bitvärdet (0 = Auto, 1 = Manual), offset, `effManualMask`, firmware, EEPROM, standardvärden (defaultValue "Auto") och golden är oförändrade. Inga tester eller firmware jämför mot texten.
+
+**Mutationskontroll** (tillfälliga fel i en kopia av ini:n, alla fällda av validatorn): MaxChargeVolt hi 700 (råvärde > U16), man_bulkAmp lo 20 > hi 15, mätare min = max, enhet man_absorbVolt "mV", offset-överlapp, offset utanför sidan, okänt menymål, panel → help-namn, ovr "Manuell", "manual", "Automatic", felstavad Help-post (`safetyHlp`), felstavad topicHelp och omdöpt help-block.
+
+**[U]:** att TS öppnar hjälptexten från menyn, och hur TS läser en .msq som sparats med alternativtexten "Manuell" (HIL 10.6). Validatorns original på Drive är inte uppdaterat; repots kopia gäller.

@@ -167,6 +167,11 @@ def do_constants(t):
     assert done_hi == set(HI) | set(HI_CHECK), (set(HI) | set(HI_CHECK)) - done_hi
     assert set(done_opt) == set(OPTS), set(OPTS) - set(done_opt)
     assert done_unit == set(UNIT_FIELD)
+    # BESLUT nr 50: kommentarerna ovanfor ovr_* foljer alternativtexten
+    for i, line in enumerate(lines):
+        if line.lstrip().startswith(';'):
+            line = re.sub(r'Manuell = man_', 'Manual = man_', line)
+            lines[i] = re.sub(r'(ovr_\w+) = Manuell\b', r'\1 = Manual', line)
     t = t[:a] + '\n'.join(lines) + t[b:]
     # standardvarden for oversatta alternativ
     a, b = section_span(t, 'ConstantsExtensions')
@@ -218,6 +223,9 @@ AUTO = {
              ('chargeTempMax', 'Charge temp max (not active)')],
 }
 LABEL = {x: l for g in AUTO.values() for x, l in g}
+# BESLUT nr 50: kallval ovr_* "Auto"/"Manual" (kallfilen har "Manuell"). Bara texten; bitvardet 0/1 ar oforandrat.
+for _x in LABEL:
+    OPTS['ovr_' + _x] = ['Auto', 'Manual']
 
 # ---------------------------------------------------------------- [GaugeConfigurations]
 GTITLE = {
@@ -416,7 +424,7 @@ HELP = [
   'Copy effective values to stage table (Auto mode - battery) fills the table from the effective auto values.']),
  ('autoHelp', 'Auto mode', [
   'Set battery type, nominal voltage and capacity. The firmware calculates all charge parameters: current = C-rate x capacity limited by the current cap, voltages per cell x cell count, tail current = share of capacity with a floor, and the times.',
-  'To change one parameter, set its source to Manuell (manual) and enter the value. The other parameters stay Auto.',
+  'To change one parameter, set its source to Manual and enter the value. The other parameters stay Auto.',
   'The gauges on the right show the effective value that the firmware uses. They need a connection.',
   'Max charge voltage, Max charge current and the voltage limit always apply, also to manual values.',
   'Absorption and float voltages are given at 25 ' + DC + '. Temperature compensation is not active because there is no battery temperature sensor.',
@@ -437,38 +445,12 @@ HELP = [
 ]
 HELPNAMES = [h[0] for h in HELP]
 
-def wrap(s, n=72):
-    out, cur = [], ''
-    for w in s.split(' '):
-        if cur and len(cur) + 1 + len(w) > n:
-            out.append(cur)
-            cur = w
-        else:
-            cur = (cur + ' ' + w) if cur else w
-    if cur:
-        out.append(cur)
-    return out
-
 def help_blocks():
     L = []
     for name, title, paras in HELP:
         L.append('help = %s, %s' % (name, q(title)))
         for k, p in enumerate(paras):
             L.append('   text = %s' % q(p + ('<br>' if k < len(paras) - 1 else '')))
-    return L
-
-def help_dialogs():
-    # Help-menyn pekar pa dialoger (ref/validate_ini_v2.2.py godtar inte subMenu -> help-namn).
-    L = []
-    for name, title, paras in HELP:
-        L.append('dialog = dlgHelp_%s, %s' % (name, q(title)))
-        L.append('   topicHelp = %s' % name)
-        for k, p in enumerate(paras):
-            if k:
-                L.append('   field = ""')
-            for line in wrap(p):
-                L.append('   field = %s' % q(line))
-        L.append('')
     return L
 
 # ---------------------------------------------------------------- [UserDefined]
@@ -651,7 +633,6 @@ def userdefined():
           '   topicHelp = protectionHelp', '   panel = derateCurve', '',
           'dialog = dlgAmpTimeCurve, "Time-current protection (not active)"',
           '   topicHelp = protectionHelp', '   panel = ampTimeCurve', '']
-    L += help_dialogs()
     return '\n'.join(L) + '\n'
 
 CURVES = '''   curve = mosfetTempCurve, "MOSFET temp calibration (not active)"
@@ -720,8 +701,9 @@ def menu():
          '   menu = "Tools"',
          '      subMenu = std_realtime, "Realtime display"',
          '   menu = "Help"']
+    # BESLUT nr 50: Help-menyn pekar direkt pa help-namnen (ecudef 15.3.3, "accessed by name from a [Menu]")
     for name, title, _ in HELP:
-        L.append('      subMenu = dlgHelp_%s, %s' % (name, q(title)))
+        L.append('      subMenu = %s, %s' % (name, q(title)))
     return '\n'.join(L) + '\n\n'
 
 # ---------------------------------------------------------------- [SettingContextHelp]
@@ -827,9 +809,9 @@ def ctx():
              'chargeTempMin', 'chargeTempMax', 'prechargeVolt', 'prechargeAmp', 'prechargeMaxTime',
              'voltLimit', 'totalMaxTime', 'batteryPresentVolt']
     for x in order:
-        H.append(('ovr_' + x, 'Source for %s: Auto = calculated, Manuell = manual value.' % LABEL[x].split(' (')[0]))
+        H.append(('ovr_' + x, 'Source for %s: Auto = calculated, Manual = manual value.' % LABEL[x].split(' (')[0]))
     for x in order:
-        H.append(('man_' + x, 'Manual value: %s Used when the source is Manuell or the type is Custom.' % PDESC[x]))
+        H.append(('man_' + x, 'Manual value: %s Used when the source is Manual or the type is Custom.' % PDESC[x]))
     return '\n'.join('   %s = %s' % (k, q(v)) for k, v in H) + '\n\n', [k for k, _ in H]
 
 DATALOG = [('seconds', 'Time', 'int', '%d'), ('chargerState', 'State', 'int', '%d'),

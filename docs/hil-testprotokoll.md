@@ -77,7 +77,7 @@ Inställning: MaxChargeVolt > 0 och lagom låg för dummylasten, chargeMode Enke
 | 6.6 | E6 (nollställ strömgivare) i vila | outAmp ≈ 0 efteråt | |
 | 6.7 | E7 (auto → manuell) | man_* på sida 5 = autovärden. ovr-bitar oförändrade. Ingen burn (kontrollera efter omstart). | |
 | 6.8 | E8 (Kopiera effektiva → stegtabell) i vila, standardvärden och kapacitet satt | Sida 2 s1 = CC/bulkAmp/absorb, s2 = CV/tail, s3 = CV/float, s4 = övervaka (restartMode på) eller av. Byte 0–3 och sida 5 oförändrade. `pageRefreshReq` bit 0x02 är 1 i ca 1 s och TS läser om sida 2. Ingen burn: värdena borta efter omstart utan B (BESLUT nr 40). | |
-| 6.8a | E8 med en override (t.ex. ovr bulkAmp = Manuell, man 25 A) | s1/s2 ström = effektivt värde (begränsat av hårdvarutaket), inte autovärdet | |
+| 6.8a | E8 med en override (t.ex. ovr bulkAmp = Manual, man 25 A) | s1/s2 ström = effektivt värde (begränsat av hårdvarutaket), inte autovärdet | |
 | 6.8b | E8 med kapacitet 0 (AH_MISSING) | Ingen ändring på sida 2. Ingen pageRefreshReq-bit. | |
 | 6.8c | E8 och sedan B i vila, omstart | Stegtabellen finns kvar | |
 | 6.9 | E9 (alla → Auto) | ovr-bitarna = 0 och man_* oförändrade | |
@@ -146,7 +146,7 @@ Kan kontrolleras i TunerStudio utan laddning (offline-projekt räcker för 10.3.
 |---|---|---|---|
 | 10.3.1 | Öppna projektet med tunerStudio_v2.2.ini. Titta på enheter med grad-tecken (t.ex. Charge temp min, MaxTemp) | "°C" visas, inte "Â°" eller "?" (filen är ISO-8859-1) [U] | |
 | 10.3.2 | Menyraden | Menyerna Charger, Protection, Driver, Calibration och Diagnostics finns. Tools har "Realtime display" (std_realtime). Help har 7 poster tillagda efter TS egna | |
-| 10.3.3 | Help → varje post | Dialogen visar texten. Knappen/länken för hjälp (topicHelp) öppnar help-blocket med radbrytningar (`<br>`) [U] | |
+| 10.3.3 | Help → varje post | Ersatt av 10.6.1 (BESLUT nr 50: Help-posterna pekar direkt på help-blocken, dialogerna dlgHelp_* finns inte längre) | |
 | 10.3.4 | Hjälpknappen i Charger max values, Auto mode, Stage 1–4, Protection, Sensors, Diagnostics | Rätt help-block öppnas [U: topicHelp mot help-namn är inte dokumenterat i specen] | |
 | 10.3.5 | Framsidan | 8 mätare och 13 indikatorer (13:e = WarnVoltClamped, BESLUT nr 48). Högerklick på en indikator listar de övriga (indicatorTemplate) [U] | |
 | 10.3.6 | Strömfält, t.ex. Stage 1 current och Manual value för bulk current | Går inte att mata in över 15,00 A | |
@@ -177,8 +177,18 @@ Inget av detta är provat. Laddaren lämnas inte obevakad under provet.
 | 10.5.1 | Auto mode - battery: fältet Temperature compensation | Fältet är gråmarkerat och går inte att ändra (`{ 0 }`) [U]. Värdet "On - NOT ACTIVE, NO EFFECT ..." visas för standardvärdet | |
 | 10.5.2 | Charger max values och Protection: MaxTemp | Etiketten säger "MOSFET Tj max ... not a protection". Hjälptexten säger att 125 °C är Tj-max och inte ett aktivt skydd | |
 | 10.5.3 | Högerklick på en indikator, välj t.ex. "MOSFET over-temp (not active)" | På-texten (visas aldrig, firmware sätter inte biten) slutar med "(NOT ACTIVE)" | |
-| 10.5.4 | Med kort: Battery limits, sätt man_voltLimit (Manuell) under absorptionsspänningen | Framsidans indikator "WARNING: CHARGE VOLTAGE CLAMPED ..." lyser röd. Återställ: indikatorn släcks | |
+| 10.5.4 | Med kort: Battery limits, sätt man_voltLimit (Manual) under absorptionsspänningen | Framsidans indikator "WARNING: CHARGE VOLTAGE CLAMPED ..." lyser röd. Återställ: indikatorn släcks | |
 
+
+### 10.6 Help-menyn och källvalet Manual (BESLUT nr 50)
+
+Inget av detta är provat i TunerStudio.
+
+| # | Steg | Förväntat | Resultat |
+|---|---|---|---|
+| 10.6.1 | Help → var och en av de 7 posterna (Safety, Soft start, Charging stages, Auto mode, Protection, Sensors and calibration, Diagnostics) | TS öppnar hjälptexten direkt (help-blocket) med rätt rubrik och radbrytningar (`<br>`). Notera om TS i stället ger fel eller tom meny [U] | |
+| 10.6.2 | Auto mode → en källa (t.ex. Bulk current) | Rullistan visar "Auto" och "Manual". Manual visar fältet för manuellt värde | |
+| 10.6.3 | Öppna en .msq som sparats med den gamla ini:n (alternativet "Manuell") | Värdet läses som Manual (bitvärde 1), inte som ogiltigt. Notera eventuella varningar från TS om okänd alternativtext [U] | |
 
 ## Ej testbart i v2.2
 
