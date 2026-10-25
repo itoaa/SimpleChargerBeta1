@@ -26,6 +26,8 @@ hdr_add = (
 ";   * errorBits b12 = bulkAhPct overskriden, egen bit i stallet for b9 (BESLUT nr 36).\n"
 ";   * restrictionBits b9 = strommgivaren mattad (+-32,767 A), BESLUT nr 37.\n"
 ";   * restrictionBits b10 = currentSensor andrad, omstart (E5) kravs, ingen start, BESLUT nr 39.\n"
+";   * E8 (Kopiera effektiva -> stegtabell s1-s4): s1 bulk, s2 absorption, s3 float, s4 overvaka;\n"
+";     forladdning foljer inte med; ignoreras vid AH_MISSING/NOMV_INVALID; ingen burn (BESLUT nr 40).\n"
 "; Firmware-tolkning av %o/%c: 1 byte vardera (sidor <= 255 B). Inte testad i riktig TunerStudio.\n"
 "; Compat-filerna (tunerStudio.ini, SmedbyCharger_compat.ini) ar OFORANDRADE.\n"
 "; -------------------------------------------------------------------------------------\n")

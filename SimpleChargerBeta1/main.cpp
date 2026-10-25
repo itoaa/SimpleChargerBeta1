@@ -56,7 +56,7 @@ static const uint8_t PwmFreqKhz = 31U;
 /* OCR = steg x 10 (som tidigare setDuty). */
 static const uint8_t OcrPerStep = 10U;
 static const uint32_t LoopMs = 100U;
-static const uint32_t RefreshHoldMs = 1000U;   /* pageRefreshReq ca 1 s (otestat i TS) */
+static const uint32_t RefreshHoldMs = 1000U;   /* pageRefreshReq ca 1 s (vardtestad hjalpare, otestat i TS) */
 /* Spanningsdelarnas fullskala i cV (ADC 1023), samma som tidigare 55/65/20,1 V. */
 static const uint16_t OutVoltFullCv = 5500U;
 static const uint16_t InVoltFullCv = 6500U;
@@ -76,8 +76,7 @@ static uint8_t gBootSensorSel;
 struct AppState
 {
 	sPWM*    pwm;
-	uint32_t refreshMs;
-	uint8_t  refresh;      /* pageRefreshReq */
+	PageCommands::RefreshHold refresh;   /* pageRefreshReq */
 	bool     zeroReq;      /* E6 */
 	bool     rebootReq;    /* E5 */
 };
@@ -161,12 +160,12 @@ static void onCommand(uint8_t code, void*)
 		AutoParams::Input in;
 		uint8_t bits;
 		PageCommands::autoInputBoot(gStore.page(TsLayout::PageIdx1), gBootSensorSel, in);
-		bits = PageCommands::apply(code, gStore.page(TsLayout::PageIdx5), in);
+		bits = PageCommands::apply(code, gStore.page(TsLayout::PageIdx5),
+		                           gStore.page(TsLayout::PageIdx2), in);
 		if (bits != 0U)
 		{
 			computeAuto();
-			gApp.refresh |= bits;
-			gApp.refreshMs = millis();
+			PageCommands::refreshSet(gApp.refresh, bits, millis());
 		}
 	}
 	else
@@ -202,8 +201,7 @@ int main()
 	sPWM myPwm(pwmPort, pwmPin);
 	myPwm.setDutyValue(0);
 	gApp.pwm = &myPwm;
-	gApp.refresh = 0U;
-	gApp.refreshMs = 0U;
+	PageCommands::refreshInit(gApp.refresh);
 	gApp.zeroReq = false;
 	gApp.rebootReq = false;
 
@@ -305,10 +303,6 @@ int main()
 				}
 			}
 
-			if ((gApp.refresh != 0U) && ((uint32_t)(now - gApp.refreshMs) >= RefreshHoldMs))
-			{
-				gApp.refresh = 0U;
-			}
 
 			/* Realtidsblocket. Temperaturer: ingen givare i v2.2 (etapp 6)
 			 * -> 0 och ADC 0, dvs. "ej tillganglig". Instrom saknas -> 0. */
@@ -328,7 +322,7 @@ int main()
 			tsRtSetBurnRejected(rt, gStore.burnRejectedCharging());
 			/* Stromgivaren mattad (+-32767 mA) -> restrictionBits b9 (BESLUT nr 37). */
 			tsRtSetRestr(rt, TsLayout::RestrCurrentSat, outputCurrent.saturated());
-			rt[TsLayout::RtPageRefreshReq] = gApp.refresh;
+			rt[TsLayout::RtPageRefreshReq] = PageCommands::refreshTick(gApp.refresh, now, RefreshHoldMs);
 			rt[TsLayout::RtEepromWarnBits] = gStore.warnBits();
 
 			green.setHigh();

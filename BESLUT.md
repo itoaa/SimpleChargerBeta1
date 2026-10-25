@@ -338,3 +338,52 @@ Förslag 6 i docs/forslag-2-3-4-6.md, godkänt av Ola 2026-10-25 11:48 (via Max)
   - test_pagecmd: sensorSel/autoInputBoot.
   - Mutationer som fälls: sensorOk alltid sant, ingen b10, start inte spärrad, timer inte spärrad.
 - Inte verifierat på hårdvara eller i TunerStudio.
+
+## 40. E8: effektiva värden → stegtabell s1–s4 (2026-10-25)
+Förslag 2 i docs/forslag-2-3-4-6.md (alternativ A), godkänt av Ola 2026-10-25 11:48 (via Max). Ersätter "E8 gör ingenting" i nr 28/34.
+
+**Mappning** (`PageCommands::copyEffectiveToSteps`, bara sida 2 byte 4..83):
+
+| Steg | method | onEnd | Innehåll |
+|---|---|---|---|
+| s1 = bulk | CC | Nästa | current bulkAmp, volt absorb, endVoltMax absorb, maxTime bulkMaxTime, endAhPct bulkAhPct |
+| s2 = absorption | CV | Nästa | current bulkAmp, volt absorb, endAmpMin tail, maxTime absorbMaxTime, minTime absorbMinTime |
+| s3 = float | CV | Nästa | current floatAmp, volt float, maxTime floatMaxTime |
+| s4 = övervaka | Monitor om restartMode (sida 2 byte 0 bit 2) är på, annars Av | Gå till steg 1 om Monitor, annars Stopp klar | endVoltMin restartVolt om Monitor |
+
+- Alla övriga fält blir 0.
+- tempMax/tempMin = chargeTempMax/Min i alla steg.
+- **Förladdningen får ingen plats.** eff_totalMaxTime saknar fält.
+- **Klampning** till ini-intervallen:
+  - ström 0..3000 cA
+  - spänning 0..6000 cV
+  - maxTime 0..6000 min
+  - minTime 0..65535 s
+  - endAhPct 0..200
+  - tempMax −40..80
+  - tempMin −40..60
+  - negativa värden → 0
+- **Effektiva värden med override:**
+  - `compute(page5, in, r)` utan ignoreOverrides, alltså `man_X` där `ovr_X` = Manuell, begränsat av hårdvarutaken.
+  - Detta avviker från kodskissen i förslaget, som anropade `compute(..., true)`. Skissen motsäger förslagets text ("E8 kopierar **effektiva** värden ... override respekteras") och testfall 2. Text och test har följts.
+- **Spärr:** E8 ignoreras (returnerar 0, ingen ändring) när autoWarnBits har AH_MISSING eller NOMV_INVALID.
+- **Ingen EEPROM:**
+  - Bara RAM-kopian ändras, och ändringen sparas först vid B.
+  - Byte 0–3 (startMode/restartMode/startDelayMin) rörs inte. Sida 5 (ovr, man_*) och chargeMode rörs inte.
+  - E8 är tillåten under laddning, eftersom tabellen inte används av Auto eller Enkel.
+- **pageRefreshReq:**
+  - Returnerar 0x02.
+  - main håller bitarna i 1 000 ms via `PageCommands::RefreshHold` (refreshSet/refreshTick), som ersätter de tidigare fälten i AppState och har samma beteende. Hjälparen är värdtestad, men inte main-flödet.
+- **Definition för chargeMode 1** (inte implementerat, nr 34): maxTime och endAhPct ger alltid fel (ErrMaxTime/ErrBulkAh), och onEnd gäller bara U/I-villkoren. totalMaxTime ska fortsätta skydda. minTime-mappningen är ungefärlig [U].
+- **Flash:** cirka +1,3 kB (copyEffectiveToSteps 578 B + writeStep 594 B), mätt med avr-nm. Förslagets uppskattning 250–350 B [U] var för låg. Det ligger fortfarande långt under gränsen (se rapport/PR).
+- **Tester** (test_pagecmd):
+  - standard → tabell + byte 0–3 och övriga sidor orörda + idempotent
+  - manuell bulkAmp 25 A → 15 A i s1/s2
+  - restartMode av/på
+  - klampning
+  - AH_MISSING och NOMV_INVALID
+  - ingen EEPROM-skrivning
+  - refresh-hållning inklusive millis-överslag
+  - matris med 30 720 körningar, alla fält inom ini-intervall
+- **Mutationer som fälls:** override ignoreras, ingen spärr vid AH_MISSING, ingen klampning, s4 alltid Av, fel basoffset, hållning `>` i stället för `>=`, temperatur inte klampad.
+- Inte verifierat i TunerStudio (sidomläsning via triggeredPageRefresh) eller på hårdvara.
