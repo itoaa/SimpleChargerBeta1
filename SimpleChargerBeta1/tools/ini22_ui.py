@@ -262,6 +262,9 @@ for x in ('bulkAmp', 'tailAmp', 'floatAmp', 'prechargeAmp'):
 # BESLUT nr 47: framsidans spanningsmatare, rod zon fran taket (hiWarning = hiDanger)
 GLIM['outVoltGauge'] = ('0', '60', '0', '0', HW_VOLT, HW_VOLT)  # 0..60 V, rod fran 55 V (HwVoltMaxCv)
 GLIM['inVoltGauge'] = ('0', '70', '9', '10', '65', '65')        # 0..70 V, rod fran 65 V (MaxInputVolt max)
+# BESLUT nr 49: drivspanning 0..18 V, gul 15..16 V, rod fran 16 V (HwDriverVoltMaxDv, faltets max).
+# Lagzonen (rod under 10 V, gul 10..11 V) ar oforandrad.
+GLIM['driverVoltGauge'] = ('0', '18', '10', '11', '15', HW_DRV)
 
 def do_gauges(t):
     a, b = section_span(t, 'GaugeConfigurations')

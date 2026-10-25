@@ -130,6 +130,17 @@ if g is not None:
     expect('inVoltGauge lo/hi', (0, 70), (int(g[0]), int(g[1])))
     expect('inVoltGauge rod (MaxInputVolt hi)', (ini_hi('MaxInputVolt', 100),) * 2, (int(round(g[4] * 100)), int(round(g[5] * 100))))
 
+# BESLUT nr 49: driverVoltGauge 0..18 V, rod fran HwDriverVoltMaxDv (16 V), gul under rod.
+# Faltets max ar fortsatt 16 V (nr 46), inte matarens 18 V.
+expect('HwDriverVoltMaxDv = 160 (nr 46, 16,0 V)', hw.get('HwDriverVoltMaxDv'), 160)
+expect('driverVoltMax hi (nr 46, 16 V)', 160, ini_hi('driverVoltMax', 10))
+g = gauge('driverVoltGauge')
+if g is not None:
+    expect('driverVoltGauge lo/hi', (0, 18), (int(g[0]), int(g[1])))
+    expect('driverVoltGauge rod (HwDriverVoltMaxDv)', hw.get('HwDriverVoltMaxDv'), int(round(g[5] * 10)))
+    expect('driverVoltGauge gul < rod <= hi', True, g[3] <= g[4] < g[5] <= g[1])
+    expect('driverVoltGauge lag rod/gul 10/11', (100, 110), (int(round(g[2] * 10)), int(round(g[3] * 10))))
+
 # BESLUT nr 48: WarnVoltClamped pa framsidan (rod), inga "(not active)"-funktioner som ser aktiva ut
 aph = dict((m.group(1), int(m.group(2), 16)) for m in re.finditer(
     r'const\s+uint16_t\s+(Warn\w+)\s*=\s*0x([0-9A-Fa-f]+)U', open(os.path.join(ROOT, 'shared', 'autoParams.hpp')).read()))

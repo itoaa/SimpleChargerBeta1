@@ -155,7 +155,7 @@ Kan kontrolleras i TunerStudio utan laddning (offline-projekt räcker för 10.3.
 | 10.3.9 | Med kort: E8 (Copy effective values to stage table) med 36 V bly typ 0 och MaxChargeVolt = 0 | Inga spänningar över 55,00 V i stegtabellen (E8 klampar till `HwVoltMaxCv`, BESLUT nr 45) | |
 | 10.3.10 | Battery limits | Dialogen visar fälten och de effektiva mätarna. Ändring i Battery limits syns i Auto mode-dialogerna (samma konstanter) | |
 
-### 10.4 Spänningstak 55 V ut / 65 V in, driverVolt 16 V och mätare (BESLUT nr 45–47)
+### 10.4 Spänningstak 55 V ut / 65 V in, driverVolt 16 V och mätare (BESLUT nr 45–47, 49)
 
 Inget av detta är provat.
 
@@ -166,6 +166,7 @@ Inget av detta är provat.
 | 10.4.3 | Med kort, dummylast: MaxChargeVolt 55,00 V, mät utspänningen med extern multimeter | Utspänningen går inte över 55 V (ErrOverVoltOut vid ≥ MaxChargeVolt). Kräver att mätkretsen faktiskt når 55 V [U] | |
 | 10.4.4 | Med kort: läs sida 3 efter en .msq med driverVoltMax 20,0 V (BESLUT nr 46) | Läses tillbaka som 16,0 V efter skrivning eller omstart. Fälten är inte aktiva i firmware | |
 | 10.4.5 | Framsidan: Output voltage och Input voltage (BESLUT nr 47) | Output 0–60 V, röd från 55 V. Input 0–70 V, röd från 65 V. Notera hur TS ritar zonen när varning = fara [U] | |
+| 10.4.6 | Framsidan: Driver voltage (BESLUT nr 49) | Skala 0–18 V. Gul 15–16 V, röd från 16 V (fältets max). Röd under 10 V, gul 10–11 V. Fältet driverVoltMax går fortfarande bara till 16,0 V | |
 
 ### 10.5 Temperaturskydd inte aktivt, WarnVoltClamped (BESLUT nr 48)
 

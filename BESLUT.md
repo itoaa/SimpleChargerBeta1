@@ -550,3 +550,14 @@ Olas beslut 2026-10-25 14:15 (via Max). Ola accepterar uttryckligen att temperat
 **[U]:**
 - Att TS gråmarkerar ett fält med `{ 0 }`. Det är inte provat i TunerStudio.
 - Att ett befintligt "On" inte går att stänga av i TS när fältet är skrivskyddat. Det har ingen effekt i firmware, men ger autovarning b6 (gul, i högerklicksmenyn).
+
+## 49. Mätaren driverVoltGauge 0–18 V (2026-10-25)
+Olas beslut 2026-10-25 14:42 (via Max): mätaren "Driver voltage" på framsidan ska visa 0–18 V. Fältens max (`driverVoltMin`/`driverVoltMax`) är fortsatt 16 V enligt nr 46 och ändras inte.
+
+| Mätare | Före (lo, hi, loDanger, loWarning, hiWarning, hiDanger) | Efter |
+|---|---|---|
+| `driverVoltGauge` "Driver voltage" | 0, 20, 10, 11, 15, 16 | 0, 18, 10, 11, 15, 16 |
+
+- Zoner: röd från 16 V, som är fältets max (`HwDriverVoltMaxDv`, hämtas av generatorn). Gul 15–16 V. Lågzonen (röd under 10 V, gul 10–11 V) är oförändrad. Zonerna fanns redan; bara skalans max ändras från 20 till 18 V. Zongränserna är presentation och bygger inte på någon firmwarekontroll: driverVolt-fälten är inte aktiva (nr 46), och drivstegets verkliga tålighet är inte kontrollerad mot datablad [U].
+- Genereras i `tools/ini22_ui.py` (GLIM). `test/check_ini_layout.py` kontrollerar skalan 0–18, att den röda gränsen är lika med `HwDriverVoltMaxDv`, att gul ligger under röd, lågzonen 10/11 V, och att `HwDriverVoltMaxDv` = 160 och `driverVoltMax`-max i ini = 16 V. Mutationskontroll: hi 20, hiDanger 17, hiWarning 16 och 17, loDanger 9, lo 1, fältmax 18, borttagen mätare och `HwDriverVoltMaxDv` 180 fälls alla.
+- Ingen ändring av firmware, layout, EEPROM, standardvärden eller golden.
