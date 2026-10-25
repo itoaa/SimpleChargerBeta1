@@ -120,25 +120,18 @@ avrdude -c <PROGRAMMER> -P <PORT> -p m328p -U efuse:r:-:h
 - BOD är det enda som hindrar CPU:n från att köra, och skriva EEPROM, vid för låg spänning.
 - CRC och huvudet-sist hindrar bara att trasiga data används.
 
-## FÖRSLAG (inte godkänt av Ola): standardvärde för MaxChargeVolt
-**Förslag:** behåll **0 = utgång av** som standardvärde. Det är SPEC_v2.2.md öppen fråga 7.
+## 24. MaxChargeVolt standardvärde 0 = utgång av (2026-10-25)
+Ola har bekräftat det tidigare förslaget: standardvärdet för MaxChargeVolt är **0 = utgång av** (SPEC_v2.2.md öppen fråga 7).
 
 **Skäl:**
-1. Säkerheten först. En laddare med ogiltigt EEPROM ska inte ladda. Standardvärden laddas när huvudet är ogiltigt, vid CRC-fel på sida 1, och efter uppgradering eftersom ingen migrering görs (beslut 14). Med 0 startar laddaren då inte. Med ett tal laddar den på gissade gränser.
-2. Det stämmer med beslut 10 och dagens beteende. README säger att PWM står på duty 0 tills TunerStudio har en spänningsgräns och en strömgräns (`main.cpp:68`).
-3. Ett fast tal fungerar inte för alla batterityper. Autoläget räknar redan voltLimit per typ: 2,50 V/cell = 15,00 V för 12 V bly och 14,60 V för LiFePO4.
+- Standardvärden används när huvudet är ogiltigt, vid CRC-fel på sida 1 och efter uppgradering (beslut 14). Då ska laddaren inte ladda på gissade gränser.
+- Det stämmer med beslut 10 och `main.cpp:68` i B-2.
+- Autoläget räknar redan voltLimit per batterityp.
 
-**Alternativen:**
+**Bortvalda alternativ:**
+- **14,40 V** underladdar batterier med absorption 14,70 V.
+- **14,70 V** tar bort temperaturkompensationen uppåt i kyla.
+- **15,00 V** tillför inget för 12 V bly, gör att laddaren laddar okonfigurerad och fungerar inte för 24 V.
+- **Tak = absorptionsspänningen** beror på batterityp och temperatur och kan därför inte vara ett fast värde.
 
-| Alternativ | Följd |
-|---|---|
-| 14,40 V | begränsar standardbatteriet (60 Ah våt start), kalcium/EFB och våt djupcykel med absorption 14,70 V till 14,40 V (VOLT_CLAMPED) och underladdar dem |
-| 14,70 V | tar bort temperaturkompensationen uppåt vid kyla (spec: 15,00 V vid 0 °C) |
-| 15,00 V | samma som autoläget redan ger för 12 V bly, så taket tillför inget där. Det gör att laddaren laddar okonfigurerad. För 24 V hindrar det laddning |
-| tak = absorptionsspänningen ur autoläget | går inte som fast standardvärde, eftersom absorption beror på typ och temperatur. Det blir dubbelt mot autolägets voltLimit och tar bort temperaturkompensationen uppåt |
-
-Om förslaget godkänns behövs ingen ändring av standardvärden, golden eller tester. MaxChargeVolt är redan 0, och `test_eeprom.cpp` kontrollerar det.
-
-**Kvar att tänka på:**
-- I v2.2-ini (rad 662) och `auto_params_v2.2.py` (rad 164) betyder MaxChargeVolt 0 "inget extra tak" i beräkningen av voltLimit. TS visar då voltLimit 15,00 V trots att utgången är av.
-- Det är inte en säkerhetsrisk, eftersom firmware stoppar utgången först. Men visningen kan behöva en varning när v2.2 kopplas in. Ini ändras inte nu.
+**TS-visningen ses över vid inkopplingen.** I v2.2-ini (rad cirka 662, `pa_voltLimit`) och `auto_params_v2.2.py` (rad cirka 164) betyder MaxChargeVolt 0 "inget extra tak". TS visar då voltLimit 15,00 V fast utgången är av. Det hanteras i v2.2-implementationen.
