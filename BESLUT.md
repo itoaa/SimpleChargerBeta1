@@ -518,3 +518,15 @@ Olas beslut 2026-10-25 14:13 (via Max): driverVolt max sätts till 16 V. Ersätt
 - ini: `tools/ini22_ui.py` hämtar konstanten och sätter `hi` = 16 för båda fälten. Hjälptexten anger 0-16 V. `test/check_ini_layout.py` fäller om ini-max eller offset skiljer sig från firmware.
 - Standardvärden oförändrade: `eepromDefaults` har redan driverVoltMin 100 (10,0 V) och driverVoltMax 160 (16,0 V), och ini-default är 16. Ingen ändring av EEPROM-layout, format eller golden.
 - Inte ändrat: mätaren `driverVoltGauge` (0..20 V) och övriga mätarskalor. Fälten driverVoltMin/Max används fortfarande inte av firmware för någon felkontroll (inte aktiva).
+
+## 47. Framsidans spänningsmätare 0–60 V ut och 0–70 V in (2026-10-25)
+Olas beslut 2026-10-25 14:14 (via Max). Ersätter CISO:s öppna fråga 3 om mätarskalor. Fråga 2 (validerare) är fortfarande öppen.
+
+| Mätare | Före (lo, hi, loDanger, loWarning, hiWarning, hiDanger) | Efter |
+|---|---|---|
+| `outVoltGauge` "Output voltage" | 0, 60, 0, 0, 55, 58 | 0, 60, 0, 0, 55, 55 (röd från 55 V) |
+| `inVoltGauge` "Input voltage" | 0, 65, 9, 10, 60, 63 | 0, 70, 9, 10, 65, 65 (röd från 65 V) |
+
+- hiWarning = hiDanger, så ingen gul zon. Det röda börjar exakt vid taket. Hur TS ritar en zon med samma start och slut är inte provat [U]. Lågzonen för inVolt (9/10 V) är oförändrad.
+- Genereras i `tools/ini22_ui.py` (GLIM). Utmätarens röda gräns hämtas ur `HwVoltMaxCv` (nr 45). `test/check_ini_layout.py` kontrollerar skalorna och att den röda gränsen är lika med `HwVoltMaxCv` respektive `MaxInputVolt`-max (65 V).
+- Inte ändrat: `voltSetGauge`, `driverVoltGauge`, de effektiva spänningsmätarna och övriga mätare. Ingen ändring av firmware, layout eller EEPROM.

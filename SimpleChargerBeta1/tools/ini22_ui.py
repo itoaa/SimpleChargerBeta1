@@ -259,6 +259,9 @@ for g in ('outAmpGauge', 'ampSetGauge', 'inAmpGauge'):
 for x in ('bulkAmp', 'tailAmp', 'floatAmp', 'prechargeAmp'):
     for p in ('eff_', 'pa_'):
         GLIM[p + x + 'G'] = ('0', '15', '0', '0', '15', '15')    # BESLUT nr 42
+# BESLUT nr 47: framsidans spanningsmatare, rod zon fran taket (hiWarning = hiDanger)
+GLIM['outVoltGauge'] = ('0', '60', '0', '0', HW_VOLT, HW_VOLT)  # 0..60 V, rod fran 55 V (HwVoltMaxCv)
+GLIM['inVoltGauge'] = ('0', '70', '9', '10', '65', '65')        # 0..70 V, rod fran 65 V (MaxInputVolt max)
 
 def do_gauges(t):
     a, b = section_span(t, 'GaugeConfigurations')

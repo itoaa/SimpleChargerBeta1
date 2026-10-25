@@ -112,6 +112,24 @@ for n in volt_fields:
 for n in ('driverVoltMin', 'driverVoltMax'):
     expect('%s hi (HwDriverVoltMaxDv)' % n, hw.get('HwDriverVoltMaxDv'), ini_hi(n, 10))
 
+# BESLUT nr 47: framsidans spanningsmatare. outVolt 0..60 V rod fran HwVoltMaxCv,
+# inVolt 0..70 V rod fran MaxInputVolt-max (65 V). Varning = fara (ingen gul zon).
+def gauge(name):
+    m = re.search(r'^\s*%s\s*=\s*\w+\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,([^\n]*)$' % name,
+                  open(INI, encoding='latin-1').read(), re.M)
+    if not m:
+        errors.append('matare %s saknas' % name)
+        return None
+    return [float(x) for x in m.group(1).split(',')[:6]]
+g = gauge('outVoltGauge')
+if g is not None:
+    expect('outVoltGauge lo/hi', (0, 60), (int(g[0]), int(g[1])))
+    expect('outVoltGauge rod (HwVoltMaxCv)', (hw.get('HwVoltMaxCv'),) * 2, (int(round(g[4] * 100)), int(round(g[5] * 100))))
+g = gauge('inVoltGauge')
+if g is not None:
+    expect('inVoltGauge lo/hi', (0, 70), (int(g[0]), int(g[1])))
+    expect('inVoltGauge rod (MaxInputVolt hi)', (ini_hi('MaxInputVolt', 100),) * 2, (int(round(g[4] * 100)), int(round(g[5] * 100))))
+
 # BESLUT nr 45: autolagets nominella spanningar (autoParams.cpp NomvCount/kCells) mot ini
 apsrc = open(os.path.join(ROOT, 'shared', 'autoParams.cpp')).read()
 nomv_n = int(re.search(r'const\s+uint8_t\s+NomvCount\s*=\s*(\d+)U', apsrc).group(1))
