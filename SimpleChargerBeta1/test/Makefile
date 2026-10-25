@@ -1,15 +1,18 @@
 # Vardtester (PC) och AVR-storleksprov for EEPROM-modulen.
 # Paverkar inte firmwarebygget i ../Makefile.
-#   make            -> bygg och kor vardtesterna (g++)
+#   make            -> bygg och kor alla vardtester (g++, ASan/UBSan)
+#                      golden-vektorer for AutoParams genereras fran
+#                      ref/auto_params_v2.2.py (kraver python3)
 #   make avr-probe  -> bygg avr_probe.elf och visa avr-size
 #   make golden INI=<sokvag till SmedbyCharger_v2.2.ini> -> generera golden_defaults.inc
 
 CXX      ?= g++
 SANITIZE ?= -fsanitize=address,undefined -fno-sanitize-recover=all
-CXXFLAGS  = -std=gnu++98 -O1 -g -Wall -Wextra -Werror -I../shared $(SANITIZE)
+CXXFLAGS  = -std=gnu++98 -O1 -g -Wall -Wextra -Werror -I../shared -I$(BUILD) $(SANITIZE)
 BUILD     = build
 
-HOST_SRCS = test_eeprom.cpp ../shared/crc16.cpp ../shared/eepromStore.cpp ../shared/eepromDefaults.cpp
+STORE_SRCS = ../shared/crc16.cpp ../shared/eepromStore.cpp ../shared/eepromDefaults.cpp
+HOST_SRCS = test_eeprom.cpp $(STORE_SRCS)
 
 AVR_CXX   = avr-g++
 AVR_FLAGS = -mmcu=atmega328p -DF_CPU=16000000UL -Os -std=gnu++98 -Wall -Wextra -Werror \
@@ -21,12 +24,13 @@ AVR_SRCS  = avr_probe.cpp ../shared/crc16.cpp ../shared/eepromStore.cpp ../share
 
 all: test
 
-test: $(BUILD)/test_eeprom
+test: $(BUILD)/test_eeprom $(BUILD)/golden_auto.inc
 	./$(BUILD)/test_eeprom
+	python3 ref/auto_params_v2.2.py > /dev/null
 
-$(BUILD)/test_eeprom: $(HOST_SRCS) golden_defaults.inc $(wildcard ../shared/*.hpp)
+$(BUILD)/golden_auto.inc: gen_auto_golden.py ref/auto_params_v2.2.py
 	mkdir -p $(BUILD)
-	$(CXX) $(CXXFLAGS) $(HOST_SRCS) -o $@
+	python3 gen_auto_golden.py > $@.tmp && mv $@.tmp $@
 
 avr-probe: $(BUILD)/avr_probe.elf
 	avr-size -B $<

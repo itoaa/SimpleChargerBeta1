@@ -2,7 +2,7 @@
 MCU = atmega328p
 F_CPU = 16000000UL
 CXX = avr-g++
-CXXFLAGS = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Os -Wall -ffunction-sections -fdata-sections -std=gnu++98 \
+CXXFLAGS = -mmcu=$(MCU) -DF_CPU=$(F_CPU) -Os -Wall -Wextra -ffunction-sections -fdata-sections -std=gnu++98 \
 	-Ishared -ISmeOS/Atmel328p/include -ISmeOS/Middleware/include
 LDFLAGS = -mmcu=$(MCU) -Wl,--gc-sections
 

@@ -9,3 +9,4 @@
 !charger.hex
 /test/build/
 /test/__pycache__/
+__pycache__/
