@@ -1,8 +1,8 @@
-# Förslag 2, 3, 4 och 6 (väntar på godkännande, inte implementerade)
+# Förslag 2, 3, 4 och 6 (godkända och implementerade)
 
 Status: **godkänt och implementerat.** Ola godkände förslag 2, 3, 4 och 6 som de står (via Max, 2026-10-25 11:48). Implementering: förslag 3 = BESLUT nr 37, förslag 4 = nr 38, förslag 6 = nr 39, förslag 2 = nr 40. Texten nedan är förslaget som det godkändes. Avvikelser vid implementeringen:
 
-- **Förslag 2:** kodskissen anropar `compute(..., true)`, alltså ignorerade overrides, men texten och testfall 2 kräver effektiva värden med override. Implementerat utan ignoreOverrides, vilket följer texten. Flash ökade med cirka 1,3 kB mot uppskattade 250–350 B [U].
+- **Förslag 2:** den ursprungliga kodskissen anropade `compute(..., true)`, alltså ignorerade overrides, medan texten och testfall 2 kräver effektiva värden med override. Implementerat utan ignoreOverrides enligt texten. Ola bekräftade 2026-10-25 12:28 att E8 ska ta med manuella override-värden (BESLUT nr 41). Kodskissen nedan är rättad så att den stämmer med implementationen. Flash ökade med cirka 1,3 kB mot uppskattade 250–350 B [U].
 - **Förslag 4:**
   - Bulk-slutgränsen blir min(absorb, MCV − 0,10 V), annars når Auto aldrig bulk-slut när MCV = absorption.
   - Spärrtiden nollas inte av stopp eller start.
@@ -90,16 +90,17 @@ Efter E8 sätts `refresh = RefreshPage2` (0x02). main håller biten i `RefreshHo
 - E8 ignoreras och ingen biten sätts om autoWarnBits har AH_MISSING eller NOMV_INVALID. Effektiva värden är då inte meningsfulla.
 - E8 tillåts under laddning. Sida 2-tabellen används inte av Auto eller Enkel, och chargeMode 1 är inte implementerat. När chargeMode 1 implementeras bör E8 ignoreras om `chargingActive` och chargeMode = 1 [U].
 
-### Kodskiss (inte införd)
+### Kodskiss (rättad 2026-10-25 efter BESLUT nr 41, stämmer med implementationen)
 ```cpp
 /* pageCommands.cpp: apply(code, page5, page2, in) */
 else if (code == 8U)
 {
+    /* effektiva varden MED override (man_* dar ovr = Manuell), BESLUT nr 41 */
     AutoParams::Result r;
-    AutoParams::compute(page5, in, r, true);
+    AutoParams::compute(page5, in, r);
     if ((r.warn & (AutoParams::WarnAhMissing | AutoParams::WarnNomvInvalid)) == 0U)
     {
-        copyEffectiveToSteps(r, page5, page2);   /* bara byte 4..83 */
+        copyEffectiveToSteps(r, page2);   /* bara byte 4..83 */
         refresh = RefreshPage2;
     }
 }

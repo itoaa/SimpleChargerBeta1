@@ -365,7 +365,7 @@ Förslag 2 i docs/forslag-2-3-4-6.md (alternativ A), godkänt av Ola 2026-10-25 
   - negativa värden → 0
 - **Effektiva värden med override:**
   - `compute(page5, in, r)` utan ignoreOverrides, alltså `man_X` där `ovr_X` = Manuell, begränsat av hårdvarutaken.
-  - Detta avviker från kodskissen i förslaget, som anropade `compute(..., true)`. Skissen motsäger förslagets text ("E8 kopierar **effektiva** värden ... override respekteras") och testfall 2. Text och test har följts.
+  - Detta avvek från den ursprungliga kodskissen i förslaget, som anropade `compute(..., true)`. Skissen motsade förslagets text ("E8 kopierar **effektiva** värden ... override respekteras") och testfall 2. Text och test har följts, och Ola har bekräftat det (nr 41).
 - **Spärr:** E8 ignoreras (returnerar 0, ingen ändring) när autoWarnBits har AH_MISSING eller NOMV_INVALID.
 - **Ingen EEPROM:**
   - Bara RAM-kopian ändras, och ändringen sparas först vid B.
@@ -387,3 +387,8 @@ Förslag 2 i docs/forslag-2-3-4-6.md (alternativ A), godkänt av Ola 2026-10-25 
   - matris med 30 720 körningar, alla fält inom ini-intervall
 - **Mutationer som fälls:** override ignoreras, ingen spärr vid AH_MISSING, ingen klampning, s4 alltid Av, fel basoffset, hållning `>` i stället för `>=`, temperatur inte klampad.
 - Inte verifierat i TunerStudio (sidomläsning via triggeredPageRefresh) eller på hårdvara.
+
+## 41. E8 tar med manuella override-värden (2026-10-25)
+Ola bekräftade 2026-10-25 12:28 (via Max) att E8 ska kopiera de **effektiva** värdena **med** manuella override-värden, alltså `man_X` där `ovr_X` = Manuell, begränsade av hårdvarutaken. Det är så nr 40 är implementerat (`AutoParams::compute(page5, in, r)` utan ignoreOverrides).
+- Kodskissen i docs/forslag-2-3-4-6.md är rättad så att den stämmer med implementationen.
+- Ingen kodändring. Frågan är struken ur PR-beskrivningen.
